@@ -179,8 +179,16 @@ bot.hears('✅ Забронировать', async (ctx) => {
 
     resetBooking(ctx);
     ctx.session.booking.step = 'start';
+bot.hears('✔️ Бронировать', async (ctx) => {
+  const booking = ctx.session.booking || {};
+
+  if (booking.step !== 'confirm') {
     return;
   }
+
+  // дальше текст для администратора
+});
+
 
   // Начало новой брони
   resetBooking(ctx);
