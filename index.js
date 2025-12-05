@@ -15,8 +15,8 @@ function resetBooking(ctx) {
     hours: null,
     kupel: null,
     venik: null,
--   step: 'main',
-+   step: 'start',
+  step: 'main',
+  step: 'start',
   };
 }
 
