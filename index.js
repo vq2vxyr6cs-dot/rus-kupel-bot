@@ -2,7 +2,6 @@ import { Telegraf } from "telegraf";
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Команда /start
 bot.start((ctx) => {
   ctx.reply("Привет! Я бот Русской Купели. Чтобы начать запись, нажмите 'Забронировать'.", {
     reply_markup: {
@@ -12,7 +11,6 @@ bot.start((ctx) => {
   });
 });
 
-// Нажали Забронировать
 bot.hears("Забронировать", (ctx) => {
   ctx.reply("Выберите баню:", {
     reply_markup: {
@@ -22,20 +20,12 @@ bot.hears("Забронировать", (ctx) => {
   });
 });
 
-// Обзор
 bot.hears("Обзор бань", (ctx) => {
-  ctx.reply("1) Царь баня — 2 этажа, много пара\n2) Богатырская баня — классика, купель.");
+  ctx.reply("1) Царь баня — 2 этажа\n2) Богатырская баня — купель");
 });
 
-// Выбор бани
 bot.hears(["Царь баня", "Богатырская баня"], (ctx) => {
-  ctx.reply("Введите желаемую дату и время (например, 12 декабря 18:00)");
+  ctx.reply("Введите желаемую дату и время");
 });
 
-// Запуск бота
 bot.launch();
-
-export default {
-  port: process.env.PORT || 3000,
-  fetch: () => new Response("OK"),
-};
