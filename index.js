@@ -1,415 +1,282 @@
 import { Telegraf, Markup, session } from 'telegraf';
 import express from 'express';
 
-// ================== НАСТРОЙКИ ==================
+// Создаём бота с токеном из переменной окружения
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || ''; // сюда потом внесём id админа
-
-if (!BOT_TOKEN) {
-  throw new Error('Не задан BOT_TOKEN в переменных окружения');
-}
-
-const bot = new Telegraf(BOT_TOKEN);
-
-// ================== СЕССИИ ==================
-
+// Подключаем сессии, чтобы помнить выбор пользователя
 bot.use(session());
 
+// ====== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ ======
 function resetBooking(ctx) {
   ctx.session.booking = {
-    bath: null,
-    date: null,
-    time: null,
-    hours: null,
-    kupel: null,
-    venik: null,
-    step: 'start',
+    bath: null,   // баня
+    date: null,   // дата
+    time: null,   // время начала
+    hours: null,  // длительность
+    kupel: null,  // купель
+    venik: null,  // веник
+    step: 'start' // текущий шаг
   };
 }
 
-// ================== КЛАВИАТУРЫ ==================
+// ====== КЛАВИАТУРЫ ======
 
+// Главная клавиатура
 function mainKeyboard() {
-  return Markup.keyboard([['🟢 Забронировать']]).resize();
+  return Markup.keyboard([['✅ Забронировать']]).resize();
 }
 
+// Выбор бани
 function bathKeyboard() {
   return Markup.keyboard([
-    ['🟢 Царь баня'],
-    ['🟢 Богатырская баня'],
-    ['🔴 Назад'],
+    ['🟢 Царь баня', '🟢 Богатырская баня'],
+    ['🔙 Назад']
   ]).resize();
 }
 
+// Выбор количества часов
 function hoursKeyboard() {
   return Markup.keyboard([
     ['2 часа', '3 часа'],
-    ['4 часа', 'Более 4-х часов'],
-    ['🔴 Назад'],
+    ['4 часа', 'Более 4х'],
+    ['🔙 Назад']
   ]).resize();
 }
 
-function kupelKeyboard() {
-  return Markup.keyboard([
-    ['Да, добавить купель'],
-    ['Нет, без купели'],
-    ['🔴 Назад'],
-  ]).resize();
-}
-
+// Веники
 function venikKeyboard() {
   return Markup.keyboard([
-    ['Дубовый веник'],
-    ['Берёзовый веник'],
+    ['Дубовый веник', 'Березовый веник'],
     ['Без веника'],
-    ['🔴 Назад'],
+    ['🔙 Назад']
   ]).resize();
 }
 
+// Подтверждение / изменение
 function confirmKeyboard() {
   return Markup.keyboard([
     ['✅ Подтвердить бронь'],
-    ['✏️ Изменить'],
+    ['✏️ Изменить']
   ]).resize();
 }
 
-// ================== ПОМОЩНИК: ТЕКСТ ПОДТВЕРЖДЕНИЯ ==================
-
-function buildUserSummaryText(booking) {
-  const kupelText =
-    booking.bath === 'Богатырская баня'
-      ? booking.kupel || 'нет'
-      : '-';
-
-  const venikText = booking.venik || 'нет';
-
-  return (
-    'Ваша бронь:\n\n' +
-    `Баня: ${booking.bath}\n` +
-    `Дата: ${booking.date}\n` +
-    `Время начала: ${booking.time}\n` +
-    `Длительность: ${booking.hours}\n` +
-    `Купель: ${kupelText}\n` +
-    `Веник: ${venikText}\n\n` +
-    'Если всё верно — нажмите «✅ Подтвердить бронь».\n' +
-    'Если хотите изменить — нажмите «✏️ Изменить».'
-  );
+// Клавиатура для купели (только для Богатырской бани, 2 часа)
+function kupelKeyboard() {
+  return Markup.keyboard([
+    ['Купель да', 'Купель нет'],
+    ['🔙 Назад']
+  ]).resize();
 }
 
-function buildAdminText(booking, ctx) {
-  const kupelText =
-    booking.bath === 'Богатырская баня'
-      ? booking.kupel || 'нет'
-      : '-';
+// ====== СТАРТ ======
 
-  const venikText = booking.venik || 'нет';
-
-  const userName = ctx.from.username
-    ? '@' + ctx.from.username
-    : `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim() || 'без имени';
-
-  return (
-    '🔥 Новая бронь\n\n' +
-    `Баня: ${booking.bath}\n` +
-    `Дата: ${booking.date}\n` +
-    `Время начала: ${booking.time}\n` +
-    `Длительность: ${booking.hours}\n` +
-    `Купель: ${kupelText}\n` +
-    `Веник: ${venikText}\n\n` +
-    `Клиент: ${userName}\n` +
-    `ID: ${ctx.from.id}`
-  );
-}
-
-// ================== КОМАНДЫ ==================
-
-// /start
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.reply(
-    'Привет! Я бот Русской Купели. Чтобы начать запись, нажмите «Забронировать».',
+    'Привет! Я бот Русской Купели.\nЧтобы начать запись, нажмите «Забронировать».',
     mainKeyboard()
   );
 });
 
-// Доп. команда /book
-bot.command('book', async (ctx) => {
+// ====== ГЛАВНАЯ КНОПКА «Забронировать» ======
+
+bot.hears('✅ Забронировать', async (ctx) => {
   resetBooking(ctx);
   ctx.session.booking.step = 'bath';
-  await ctx.reply(
-    'Выберите баню:\n1) Царь баня — 2 этажа, много пара\n2) Богатырская баня — классика, купель.',
-    bathKeyboard()
-  );
+  await ctx.reply('Выберите баню:', bathKeyboard());
 });
 
-// ================== ОБРАБОТКА КНОПОК ==================
+// ====== НАЗАД – ПРОСТО В НАЧАЛО ======
 
-// Главная кнопка «Забронировать»
-bot.hears('🟢 Забронировать', async (ctx) => {
-  resetBooking(ctx);
-  ctx.session.booking.step = 'bath';
-  await ctx.reply(
-    'Выберите баню:\n1) Царь баня — 2 этажа, много пара\n2) Богатырская баня — классика, купель.',
-    bathKeyboard()
-  );
-});
-
-// Кнопка «Назад» — возврат в самое начало
-bot.hears('🔴 Назад', async (ctx) => {
+bot.hears('🔙 Назад', async (ctx) => {
   resetBooking(ctx);
   await ctx.reply(
-    'Вернулись в начало. Нажмите «Забронировать», чтобы оформить новую бронь.',
+    'Вернулись в начало.\nЧтобы оформить бронь, нажмите «Забронировать».',
     mainKeyboard()
   );
 });
 
-// Выбор «Царь баня»
-bot.hears(/Царь баня/, async (ctx) => {
+// ====== ВЫБОР БАНИ ======
+
+bot.hears(['🟢 Царь баня', '🟢 Богатырская баня'], async (ctx) => {
   const booking = ctx.session.booking || {};
-  booking.bath = 'Царь баня';
+  if (booking.step !== 'bath') return;
+
+  const text = ctx.message.text;
+  booking.bath =
+    text === '🟢 Царь баня' ? 'Царь баня' : 'Богатырская баня';
   booking.step = 'date';
   ctx.session.booking = booking;
 
-  await ctx.reply(
-    'Отлично, Царь баня.\n' +
-      'Введите, пожалуйста, дату бронирования (например, 12.12.2025 или 12 декабря):'
-  );
+  await ctx.reply('Введите желаемую дату (например, 12.12.2025):');
 });
 
-// Выбор «Богатырская баня»
-bot.hears(/Богатырская баня/, async (ctx) => {
+// ====== ОБРАБОТКА ТЕКСТА (ДАТА / ВРЕМЯ И ПРОЧЕЕ) ======
+
+bot.on('text', async (ctx) => {
   const booking = ctx.session.booking || {};
-  booking.bath = 'Богатырская баня';
-  booking.step = 'date';
-  ctx.session.booking = booking;
+  const step = booking.step;
+  const text = ctx.message.text;
 
-  await ctx.reply(
-    'Отлично, Богатырская баня.\n' +
-      'Введите, пожалуйста, дату бронирования (например, 12.12.2025 или 12 декабря):'
-  );
-});
+  // Все кнопки, которые обрабатываются отдельными handlers
+  const buttonTexts = [
+    '✅ Забронировать',
+    '🟢 Царь баня',
+    '🟢 Богатырская баня',
+    '🔙 Назад',
+    '2 часа',
+    '3 часа',
+    '4 часа',
+    'Более 4х',
+    'Купель да',
+    'Купель нет',
+    'Дубовый веник',
+    'Березовый веник',
+    'Без веника',
+    '✅ Подтвердить бронь',
+    '✏️ Изменить'
+  ];
 
-// Выбор количества часов — 2 часа
-bot.hears(/2 часа/, async (ctx) => {
-  const booking = ctx.session.booking || {};
-
-  if (!booking.bath || booking.step !== 'hours') {
-    await ctx.reply('Сначала выберите баню и укажите дату/время.', mainKeyboard());
+  // Если это кнопка или команда — не обрабатываем тут
+  if (buttonTexts.includes(text) || text.startsWith('/')) {
     return;
   }
 
-  booking.hours = '2 часа';
+  // Шаг выбора даты
+  if (step === 'date') {
+    booking.date = text;
+    booking.step = 'time';
+    ctx.session.booking = booking;
+    await ctx.reply('Введите время начала (например, 18:00):');
+    return;
+  }
 
-  // Если Богатырская баня — спрашиваем про купель
-  if (booking.bath === 'Богатырская баня') {
+  // Шаг выбора времени
+  if (step === 'time') {
+    booking.time = text;
+    booking.step = 'hours';
+    ctx.session.booking = booking;
+    await ctx.reply('Сколько часов бронируем?', hoursKeyboard());
+    return;
+  }
+
+  // Если мы ни в каком шаге — просто подсказываем, что делать
+  if (!step || step === 'start') {
+    await ctx.reply(
+      'Чтобы оформить бронь, нажмите кнопку «Забронировать».',
+      mainKeyboard()
+    );
+    return;
+  }
+});
+
+// ====== ВЫБОР КОЛИЧЕСТВА ЧАСОВ ======
+
+bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (ctx) => {
+  const booking = ctx.session.booking || {};
+  if (booking.step !== 'hours') return;
+
+  const text = ctx.message.text;
+  booking.hours = text;
+
+  // Если Богатырская баня и 2 часа — предлагаем купель
+  if (booking.bath === 'Богатырская баня' && text === '2 часа') {
     booking.step = 'kupel';
     ctx.session.booking = booking;
-    await ctx.reply('Хотите добавить купель к Богатырской бане?', kupelKeyboard());
+    await ctx.reply('Добавить купель?', kupelKeyboard());
   } else {
+    booking.kupel = 'нет';
     booking.step = 'venik';
     ctx.session.booking = booking;
-    await ctx.reply('Нужны ли вам веники?', venikKeyboard());
+    await ctx.reply('Выберите веник:', venikKeyboard());
   }
 });
 
-// Выбор количества часов — 3 часа
-bot.hears(/3 часа/, async (ctx) => {
+// ====== КУПЕЛЬ (ТОЛЬКО ДЛЯ БОГАТЫРСКОЙ БАНИ 2 ЧАСА) ======
+
+bot.hears(['Купель да', 'Купель нет'], async (ctx) => {
   const booking = ctx.session.booking || {};
+  if (booking.step !== 'kupel') return;
 
-  if (!booking.bath || booking.step !== 'hours') {
-    await ctx.reply('Сначала выберите баню и укажите дату/время.', mainKeyboard());
-    return;
-  }
-
-  booking.hours = '3 часа';
+  booking.kupel = ctx.message.text === 'Купель да' ? 'да' : 'нет';
   booking.step = 'venik';
   ctx.session.booking = booking;
 
-  await ctx.reply('Нужны ли вам веники?', venikKeyboard());
+  await ctx.reply('Выберите веник:', venikKeyboard());
 });
 
-// Выбор количества часов — 4 часа
-bot.hears(/4 часа/, async (ctx) => {
+// ====== ВЕНИК ======
+
+bot.hears(['Дубовый веник', 'Березовый веник', 'Без веника'], async (ctx) => {
   const booking = ctx.session.booking || {};
+  if (booking.step !== 'venik') return;
 
-  if (!booking.bath || booking.step !== 'hours') {
-    await ctx.reply('Сначала выберите баню и укажите дату/время.', mainKeyboard());
-    return;
-  }
-
-  booking.hours = '4 часа';
-  booking.step = 'venik';
-  ctx.session.booking = booking;
-
-  await ctx.reply('Нужны ли вам веники?', venikKeyboard());
-});
-
-// Выбор количества часов — более 4-х
-bot.hears(/Более 4-х часов/, async (ctx) => {
-  const booking = ctx.session.booking || {};
-
-  if (!booking.bath || booking.step !== 'hours') {
-    await ctx.reply('Сначала выберите баню и укажите дату/время.', mainKeyboard());
-    return;
-  }
-
-  booking.hours = 'Более 4-х часов';
-  booking.step = 'venik';
-  ctx.session.booking = booking;
-
-  await ctx.reply('Нужны ли вам веники?', venikKeyboard());
-});
-
-// Купель — да
-bot.hears('Да, добавить купель', async (ctx) => {
-  const booking = ctx.session.booking || {};
-
-  if (booking.step !== 'kupel') {
-    await ctx.reply('Сначала дойдите до шага с выбором купели.');
-    return;
-  }
-
-  booking.kupel = 'да';
-  booking.step = 'venik';
-  ctx.session.booking = booking;
-
-  await ctx.reply('Нужны ли вам веники?', venikKeyboard());
-});
-
-// Купель — нет
-bot.hears('Нет, без купели', async (ctx) => {
-  const booking = ctx.session.booking || {};
-
-  if (booking.step !== 'kupel') {
-    await ctx.reply('Сначала дойдите до шага с выбором купели.');
-    return;
-  }
-
-  booking.kupel = 'нет';
-  booking.step = 'venik';
-  ctx.session.booking = booking;
-
-  await ctx.reply('Нужны ли вам веники?', venikKeyboard());
-});
-
-// Веники
-bot.hears('Дубовый веник', async (ctx) => {
-  const booking = ctx.session.booking || {};
-  booking.venik = 'дубовый';
+  booking.venik = ctx.message.text;
   booking.step = 'confirm';
   ctx.session.booking = booking;
 
-  await ctx.reply(buildUserSummaryText(booking), confirmKeyboard());
+  const summary =
+    'Ваша бронь:\n' +
+    `Баня: ${booking.bath}\n` +
+    `Дата: ${booking.date}\n` +
+    `Время начала: ${booking.time}\n` +
+    `Длительность: ${booking.hours}\n` +
+    `Купель: ${booking.kupel || 'нет'}\n` +
+    `Веник: ${booking.venik}\n\n` +
+    'Все верно?';
+
+  await ctx.reply(summary, confirmKeyboard());
 });
 
-bot.hears('Берёзовый веник', async (ctx) => {
-  const booking = ctx.session.booking || {};
-  booking.venik = 'берёзовый';
-  booking.step = 'confirm';
-  ctx.session.booking = booking;
+// ====== ПОДТВЕРЖДЕНИЕ БРОНИ ======
 
-  await ctx.reply(buildUserSummaryText(booking), confirmKeyboard());
-});
-
-bot.hears('Без веника', async (ctx) => {
-  const booking = ctx.session.booking || {};
-  booking.venik = 'без веника';
-  booking.step = 'confirm';
-  ctx.session.booking = booking;
-
-  await ctx.reply(buildUserSummaryText(booking), confirmKeyboard());
-});
-
-// Подтверждение брони
 bot.hears('✅ Подтвердить бронь', async (ctx) => {
   const booking = ctx.session.booking || {};
+  if (booking.step !== 'confirm') return;
 
-  if (booking.step !== 'confirm') {
-    await ctx.reply('Сначала заполните данные брони. Нажмите «Забронировать».', mainKeyboard());
-    return;
+  const adminUsername = 'Ru_kupel'; // без @
+
+  const adminText =
+    '🔥 Новая бронь\n\n' +
+    `Клиент: @${ctx.from.username || '-'}\n` +
+    `Имя: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}\n\n` +
+    `Баня: ${booking.bath}\n` +
+    `Дата: ${booking.date}\n` +
+    `Время начала: ${booking.time}\n` +
+    `Длительность: ${booking.hours}\n` +
+    `Купель: ${booking.kupel || 'нет'}\n` +
+    `Веник: ${booking.venik}`;
+
+  // Сообщение администратору
+  try {
+    await bot.telegram.sendMessage(`@${adminUsername}`, adminText);
+  } catch (e) {
+    console.error('Не удалось отправить администратору:', e.message);
   }
 
-  // Сообщение админу
-  if (ADMIN_CHAT_ID) {
-    try {
-      await ctx.telegram.sendMessage(ADMIN_CHAT_ID, buildAdminText(booking, ctx));
-    } catch (e) {
-      console.error('Ошибка отправки админу:', e);
-    }
-  }
-
-  // Сообщение клиенту
   await ctx.reply(
-    '✅ Спасибо! Ваша бронь подтверждена.\n' +
-      'Администратор свяжется с вами в ближайшее время.',
+    '🙏 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
     mainKeyboard()
   );
 
   resetBooking(ctx);
 });
 
-// Кнопка «Изменить» — новый цикл брони
+// ====== ИЗМЕНИТЬ БРОНЬ – НАЧАТЬ ЗАНОВО ======
+
 bot.hears('✏️ Изменить', async (ctx) => {
   resetBooking(ctx);
   ctx.session.booking.step = 'bath';
   await ctx.reply('Хорошо, давайте оформим бронь заново.\nВыберите баню:', bathKeyboard());
 });
 
-// ================== ОБРАБОТКА ПРОСТОГО ТЕКСТА (дата/время) ==================
+// ====== ЗАПУСК БОТА И EXPRESS-СЕРВЕРА ДЛЯ RENDER ======
 
-bot.on('text', async (ctx) => {
-  const text = ctx.message.text.trim();
-
-  // Команды (типа /start, /book) уже обработаны выше
-  if (text.startsWith('/')) {
-    return;
-  }
-
-  const booking = ctx.session.booking || {};
-  const step = booking.step || 'start';
-
-  // Ожидаем дату
-  if (step === 'date') {
-    booking.date = text;
-    booking.step = 'time';
-    ctx.session.booking = booking;
-
-    await ctx.reply(
-      'Теперь введите время начала (например, 18:00):'
-    );
-    return;
-  }
-
-  // Ожидаем время
-  if (step === 'time') {
-    booking.time = text;
-    booking.step = 'hours';
-    ctx.session.booking = booking;
-
-    await ctx.reply('Сколько часов бронируем?', hoursKeyboard());
-    return;
-  }
-
-  // Если пользователь пишет своё в других шагах
-  if (step === 'start' || !step) {
-    await ctx.reply(
-      'Чтобы оформить бронь, нажмите кнопку «Забронировать».',
-      mainKeyboard()
-    );
-  } else {
-    await ctx.reply('Пожалуйста, используйте кнопки под полем ввода.');
-  }
-});
-
-// ================== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER ==================
-
-bot.launch().then(() => {
-  console.log('Bot started');
-});
+bot.launch();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.get('/', (req, res) => {
   res.send('OK');
