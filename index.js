@@ -4,30 +4,21 @@ import express from 'express';
 // Создаём бота с токеном из переменной окружения
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Подключаем сессии, чтобы помнить выбор пользователя
+// Подключаем сессии
 bot.use(session());
 
+// ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
-  // если по какой-то причине session ещё не создана — создаём
-  if (!ctx.session) {
-    ctx.session = {};
-  }
-
-  ctx.session.booking = {
-    bath: null,   // баня
-    date: null,   // дата
-    time: null,   // время начала
-    hours: null,  // длительность
-    kupel: null,  // купель
-    venik: null,  // веник
-    step: 'start' // текущий шаг
-  };
+    ctx.session.booking = {
+        bath: null,     // баня
+        date: null,     // дата
+        time: null,     // время начала
+        hours: null,    // длительность
+        kupel: null,    // купель
+        venik: null,    // веник
+        step: 'start'   // текущий шаг
+    };
 }
-  };
-}
-
-// ===== КЛАВИАТУРЫ =====
-
 // Главная клавиатура
 function mainKeyboard() {
   return Markup.keyboard([['✅ Забронировать']]).resize();
