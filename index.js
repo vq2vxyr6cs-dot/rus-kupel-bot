@@ -7,8 +7,12 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // Подключаем сессии, чтобы помнить выбор пользователя
 bot.use(session());
 
-// ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
+  // если по какой-то причине session ещё не создана — создаём
+  if (!ctx.session) {
+    ctx.session = {};
+  }
+
   ctx.session.booking = {
     bath: null,   // баня
     date: null,   // дата
@@ -17,6 +21,8 @@ function resetBooking(ctx) {
     kupel: null,  // купель
     venik: null,  // веник
     step: 'start' // текущий шаг
+  };
+}
   };
 }
 
