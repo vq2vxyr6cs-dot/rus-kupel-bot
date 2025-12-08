@@ -103,7 +103,7 @@ function bookingSummary(booking) {
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.replyWithPhoto(
-    {https://ibb.co/F4Km10cz }, // Замените на реальное фото
+    {https://ltdfoto.ru/image/nuZOOu}, // Замените на реальное фото
     {
       caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
       reply_markup: mainKeyboard().reply_markup
