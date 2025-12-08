@@ -114,7 +114,7 @@ function bookingSummary(booking, user = null) {
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.replyWithPhoto(
-   { url: 'https://ltdfoto.ru/images/nuZOOu' }, // 
+   { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' }, // 
     {
       caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
       reply_markup: mainKeyboard().reply_markup
@@ -167,7 +167,7 @@ bot.action('back_to_menu', async (ctx) => {
 bot.hears('💰 Цены', async (ctx) => {
   // Отправляем картинку с ценами
   await ctx.replyWithPhoto(
-    { url: 'https://example.com/ваше-фото-цен.jpg' }, // Замените на реальное фото
+    { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' }, // Замените на реальное фото
     {
       caption: '💰 Актуальные цены на бани\n\n• Богатырская баня: X руб/час\n• Царь баня: Y руб/час\n• Купель: Z руб\n• Веники: N руб',
       reply_markup: mainKeyboard().reply_markup
