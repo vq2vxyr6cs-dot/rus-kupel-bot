@@ -148,7 +148,7 @@ bot.hears('🎥 Богатырская баня', async (ctx) => {
 // Обзор Царь бани
 bot.hears('🎥 Царь баня', async (ctx) => {
   await ctx.replyWithVideo(
-    'https://https://rutube.ru/shorts/0b6b92ff325c2d2cba1298e635610f3d// Замените на реальную ссылку
+'https://rutube.ru/video/0b6b92ff325c2d2cba1298e635610f3d/'
     {
       caption: '🎥 Обзор Царь бани\n\nПосле просмотра можете вернуться в меню.',
       reply_markup: Markup.inlineKeyboard([
