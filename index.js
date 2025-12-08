@@ -276,15 +276,40 @@ bot.on('text', async (ctx) => {
 
 // ===== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER =====
 
-bot.launch();
-
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Middleware для парсинга JSON (добавьте эту строку)
+app.use(express.json());
+
+// Health check endpoint (оставляем)
 app.get('/', (req, res) => {
-  res.send('OK');
+  res.send('Бот Русской Купели работает! ✅');
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+// Режим разработки или продакшн
+if (process.env.NODE_ENV === 'production') {
+  // 1. Установите вебхук
+  const WEBHOOK_DOMAIN = process.env.RENDER_EXTERNAL_URL || `https://ваш-сервис.onrender.com`;
+  
+  // 2. Настройте вебхук
+  app.use(await bot.createWebhook({
+    domain: WEBHOOK_DOMAIN,
+    path: '/webhook'  // По умолчанию
+  }));
+  
+  // 3. Запустите сервер
+  app.listen(PORT, async () => {
+    console.log(`🚀 Бот запущен в продакшн режиме`);
+    console.log(`📡 Вебхук: ${WEBHOOK_DOMAIN}/webhook`);
+    console.log(`🔗 Порт: ${PORT}`);
+  });
+} else {
+  // Локальная разработка
+  bot.launch();
+  console.log('🔧 Бот запущен в режиме разработки (polling)');
+}
+
+// Корректное завершение работы
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
