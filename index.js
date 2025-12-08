@@ -148,12 +148,12 @@ bot.hears('🎥 Богатырская баня', async (ctx) => {
 // Обзор Царь бани
 bot.hears('🎥 Царь баня', async (ctx) => {
   await ctx.replyWithVideo(
-'https://rutube.ru/video/0b6b92ff325c2d2cba1298e635610f3d/'
+    'https://rutube.ru/video/0b6b92ff325c2d2cba1298e635610f3d/', // ← ЗАПЯТАЯ!
     {
       caption: '🎥 Обзор Царь бани\n\nПосле просмотра можете вернуться в меню.',
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('Вернуться в меню', 'back_to_menu')
-      ])
+      ]).reply_markup
     }
   );
 });
