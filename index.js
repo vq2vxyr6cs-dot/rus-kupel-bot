@@ -310,6 +310,3 @@ if (process.env.NODE_ENV === 'production') {
   console.log('🔧 Бот запущен в режиме разработки (polling)');
 }
 
-// Корректное завершение работы
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
