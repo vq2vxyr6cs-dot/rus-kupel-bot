@@ -135,14 +135,14 @@ bot.hears('👀 Обзор бань', async (ctx) => {
 // Обзор Богатырской бани
 bot.hears('🎥 Богатырская баня', async (ctx) => {
   await ctx.replyWithVideo(
-    'https://rutube.ru/video/9e98c0a3012bd66d879b80dbde3e0bb8/' 
-    {
-      caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Вернуться в меню', 'back_to_menu')
-      ])
-    }
-  );
+  'https://rutube.ru/video/9e98c0a3012bd66d879b80dbde3e0bb8/', // ← ДОБАВЬТЕ ЗАПЯТУЮ ЗДЕСЬ!
+  {
+    caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
+    reply_markup: Markup.inlineKeyboard([
+      Markup.button.callback('Вернуться в меню', 'back_to_menu')
+    ]).reply_markup
+  }
+);
 });
 
 // Обзор Царь бани
