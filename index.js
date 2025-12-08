@@ -114,7 +114,7 @@ function bookingSummary(booking, user = null) {
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.replyWithPhoto(
-    {https://ltdfoto.ru/image/nuZOOu}, // Замените на реальное фото
+   { url: 'https://ltdfoto.ru/images/nuZOOu' }, // 
     {
       caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
       reply_markup: mainKeyboard().reply_markup
@@ -124,19 +124,18 @@ bot.start(async (ctx) => {
 // ===== ОБРАБОТКА КНОПОК И ТЕКСТА =====
 // Обработка кнопки "👀 Обзор бань"
 bot.hears('👀 Обзор бань', async (ctx) => {
-await ctx.replyWithPhoto(
-  { url: 'https://ltdfoto.ru/images/nuZOOu' }, // Добавлено url: и кавычки
-  {
-    caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
-    reply_markup: mainKeyboard().reply_markup
-  }
-);
+  await ctx.reply(
+    'Выберите баню для просмотра обзора:',
+    Markup.keyboard([
+      ['🎥 Богатырская баня', '🎥 Царь баня'],
+      ['🔙 Назад']
+    ]).resize()
+  );
 });
-
 // Обзор Богатырской бани
 bot.hears('🎥 Богатырская баня', async (ctx) => {
   await ctx.replyWithVideo(
-    'https://https://rutube.ru/shorts/9e98c0a3012bd66d879b80dbde3e0bb8// Замените на реальную ссылку
+    'https://rutube.ru/video/9e98c0a3012bd66d879b80dbde3e0bb8/' 
     {
       caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
       reply_markup: Markup.inlineKeyboard([
