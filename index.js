@@ -5,7 +5,20 @@ import express from 'express';
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // Подключаем сессии
-bot.use(session());
+// Добавьте defaultSession
+bot.use(session({
+  defaultSession: () => ({ 
+    booking: {
+      bath: null,
+      date: null,
+      time: null,
+      hours: null,
+      kupel: null,
+      venik: null,
+      step: 'start'
+    }
+  })
+}));
 
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
