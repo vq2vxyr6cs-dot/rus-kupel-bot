@@ -607,10 +607,11 @@ bot.action('cancel_edit', async (ctx) => {
   await ctx.deleteMessage();
 });
 
-// Команда для админа (оставляем без изменений)
+// Команда для админа
 bot.command('admin', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) {
-    return ctx.reply('⛔ Доступ запрещён');
+    await ctx.reply('⛔ Доступ запрещён');
+    return;  // <- return БЕЗ значения, просто для выхода из функции
   }
   
   await ctx.reply(
