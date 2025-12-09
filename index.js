@@ -485,9 +485,6 @@ bot.command('admin', async (ctx) => {
 });
 // ===== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER =====
 
-const app = express();
-const PORT = process.env.PORT || 3000; // Важно: без Number()
-
 app.use(express.json());
 
 // Обработчик для Healthcheck по пути "/"
