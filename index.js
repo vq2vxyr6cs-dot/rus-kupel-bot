@@ -1,6 +1,7 @@
 import { Telegraf, Markup, session } from 'telegraf';
 import express from 'express';
 
+
 // Создаём бота с токеном из переменной окружения
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -14,6 +15,8 @@ const ADMIN_ID = 8123590904; // Ваш ID
 bot.use(session({
   defaultSession: () => ({ 
     booking: {
+  defaultSession: () => ({ 
+    booking: {
       bath: null,
       date: null,
       time: null,
@@ -24,6 +27,7 @@ bot.use(session({
     }
   })
 }));
+
 
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
