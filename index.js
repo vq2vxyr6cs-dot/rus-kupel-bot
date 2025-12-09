@@ -20,24 +20,7 @@ if (BOT_TOKEN) {
     bot = new Telegraf(BOT_TOKEN);
     console.log('✅ Бот создан с токеном');
     
-    // Подключаем сессии только если бот создан
-    bot.use(session({
-        defaultSession: () => ({
-            booking: {
-                bath: null, date: null, time: null,
-                hours: null, kupel: null, venik: null,
-                step: 'start'
-            }
-        })
-    }));
-    
-    // Обработчик вебхука только если бот создан
-    app.use(bot.webhookCallback('/webhook'));
-} else {
-    console.error('❌ Бот НЕ создан — нет токена. Сервер запустится, но бот не будет работать.');
-}
-
-// ===== 4. Подключаем сессии =====
+ // ===== 4. Подключаем сессии =====
 bot.use(session({
     defaultSession: () => ({
         booking: {
@@ -51,6 +34,14 @@ bot.use(session({
         }
     })
 }));
+    
+    // Обработчик вебхука только если бот создан
+    app.use(bot.webhookCallback('/webhook'));
+} else {
+    console.error('❌ Бот НЕ создан — нет токена. Сервер запустится, но бот не будет работать.');
+}
+
+
 
 // ===== 5. Обязательно добавляем обработчик вебхука =====
 app.use(express.json());
