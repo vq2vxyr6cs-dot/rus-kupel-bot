@@ -260,8 +260,20 @@ if (step === 'confirm') {
   );
 
   // 2. Отправляем администратору
+ // Примерное место (строки ~210-230):
+if (step === 'confirm') {
+  booking.step = 'done';
+  ctx.session.booking = booking;
+
+  // 1. Сообщение клиенту
+  await ctx.reply(
+    '🔥 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
+    mainKeyboard()
+  );
+
+  // 2. Отправляем администратору
   try {
-    const userInfo = ctx.from; // Информация о пользователе
+    const userInfo = ctx.from;
     const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
     
     await ctx.telegram.sendMessage(
@@ -270,7 +282,7 @@ if (step === 'confirm') {
       { parse_mode: 'Markdown' }
     );
     
-    // Кнопки для админа
+    // Кнопки для админа (ЭТОТ БЛОК НУЖНО ЗАМЕНИТЬ!)
     await ctx.telegram.sendMessage(
       ADMIN_ID,
       'Действия с бронированием:',
@@ -283,6 +295,44 @@ if (step === 'confirm') {
   } catch (error) {
     console.error('Ошибка отправки админу:', error);
   }
+
+  // 3. Сбрасываем состояние
+  resetBooking(ctx);
+  return;
+}
+
+// 2. Отправляем администратору с кнопками действий
+try {
+  const userInfo = ctx.from;
+  const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
+  
+  // Отправляем сообщение админу с кнопками
+  await ctx.telegram.sendMessage(
+    ADMIN_ID,
+    adminMessage,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+            { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+          ],
+          [
+            { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+            { text: '💬 Написать', url: `tg://user?id=${ctx.from.id}` }
+          ],
+          [
+            { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
+          ]
+        ]
+      }
+    }
+  );
+  
+} catch (error) {
+  console.error('Ошибка отправки админу:', error);
+}
 
   // 3. Сбрасываем состояние
   resetBooking(ctx);
@@ -449,34 +499,122 @@ if (booking.step === 'time') {
 // ===== ОБРАБОТКА КНОПОК АДМИНА =====
 
 // Подтверждение брони админом
-bot.action(/confirm_(\d+)/, async (ctx) => {
+bot.action(/confirm_(\d+)_(\d+)/, async (ctx) => {
   const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
   
   await ctx.answerCbQuery('✅ Бронь подтверждена!');
-  await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ Подтверждено администратором`);
+  
+  // Обновляем сообщение
+  await ctx.editMessageText(
+    `${ctx.callbackQuery.message.text}\n\n✅ Подтверждено администратором @${ctx.from.username}`
+  );
   
   // Уведомляем пользователя
-  await ctx.telegram.sendMessage(
-    userId,
-    '✅ Ваша бронь подтверждена администратором! Ждём вас в указанное время.'
-  );
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      '✅ *Ваша бронь подтверждена администратором!*\n\nЖдём вас в указанное время.\nПри необходимости с вами свяжется наш администратор.',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('Не удалось уведомить пользователя:', error);
+  }
 });
 
 // Отклонение брони админом
-bot.action(/reject_(\d+)/, async (ctx) => {
+bot.action(/reject_(\d+)_(\d+)/, async (ctx) => {
   const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
   
   await ctx.answerCbQuery('❌ Бронь отклонена!');
-  await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ Отклонено администратором`);
+  
+  // Обновляем сообщение
+  await ctx.editMessageText(
+    `${ctx.callbackQuery.message.text}\n\n❌ Отклонено администратором @${ctx.from.username}`
+  );
   
   // Уведомляем пользователя
-  await ctx.telegram.sendMessage(
-    userId,
-    '❌ К сожалению, администратор отклонил вашу бронь. Пожалуйста, свяжитесь с нами для уточнения.'
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      '❌ *К сожалению, ваша бронь была отклонена.*\n\nПожалуйста, свяжитесь с нами для уточнения деталей:\n📞 +7 (XXX) XXX-XX-XX',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('Не удалось уведомить пользователя:', error);
+  }
+});
+
+// Редактирование брони админом
+bot.action(/edit_(\d+)_(\d+)/, async (ctx) => {
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
+  
+  await ctx.answerCbQuery('✏️ Запрос на редактирование');
+  
+  // Предлагаем варианты редактирования
+  await ctx.reply(
+    'Что вы хотите исправить в бронировании?',
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📅 Дата/время', callback_data: `edit_date_${userId}_${timestamp}` },
+            { text: '🏠 Баня', callback_data: `edit_bath_${userId}_${timestamp}` }
+          ],
+          [
+            { text: '⏱ Часы', callback_data: `edit_hours_${userId}_${timestamp}` },
+            { text: '💰 Услуги', callback_data: `edit_services_${userId}_${timestamp}` }
+          ],
+          [
+            { text: '📞 Контакты', callback_data: `edit_contacts_${userId}_${timestamp}` },
+            { text: '↩️ Назад', callback_data: `back_to_booking_${userId}_${timestamp}` }
+          ]
+        ]
+      }
+    }
   );
 });
-// Команда для админа
+
+// Кнопка "Позвонить" - показывает номер телефона
+bot.action(/call_(\d+)_(\d+)/, async (ctx) => {
+  await ctx.answerCbQuery('📞 Номер телефона');
+  
+  // Показываем номер телефона клиента (если он есть в базе)
+  // Или общий номер компании
+  await ctx.reply(
+    '📞 *Контактная информация:*\n\n' +
+    '• Телефон компании: +7 (XXX) XXX-XX-XX\n' +
+    '• Для связи с клиентом используйте кнопку "💬 Написать"',
+    { 
+      parse_mode: 'Markdown',
+      reply_to_message_id: ctx.callbackQuery.message.message_id
+    }
+  );
+});
+
+// Отмена редактирования
+bot.action('cancel_edit', async (ctx) => {
+  await ctx.answerCbQuery('✖️ Отменено');
+  await ctx.deleteMessage();
+});
+
+// Команда для админа (оставляем без изменений)
 bot.command('admin', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) {
+    return ctx.reply('⛔ Доступ запрещён');
+  }
+  
+  await ctx.reply(
+    'Панель администратора:',
+    Markup.keyboard([
+      ['📊 Статистика', '📋 Активные брони'],
+      ['⚙️ Настройки'],
+      ['🔙 В меню']
+    ]).resize()
+  );
+});
   if (ctx.from.id !== ADMIN_ID) {
     return ctx.reply('⛔ Доступ запрещён');
   }
