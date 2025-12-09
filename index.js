@@ -1,33 +1,39 @@
 import { Telegraf, Markup, session } from 'telegraf';
 import express from 'express';
 
+// ===== 1. Сначала создаём Express-приложение =====
+const app = express();
 
-// Создаём бота с токеном из переменной окружения
-const bot = new Telegraf(process.env.BOT_TOKEN);
+// ===== 2. Получаем токен и ВАЖНАЯ проверка =====
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const PORT = process.env.PORT || 3000;
+const ADMIN_ID = 8123590904;
 
-// ▼ ВСТАВЬТЕ ЭТУ СТРОКУ ▼
-const ADMIN_ID = 8123590904; // Ваш ID
-// ▲ ВСТАВЬТЕ ЭТУ СТРОКУ ▲
+// Логируем для отладки (увидим в логах Railway)
+console.log('🔧 Проверка переменных:');
+console.log('   PORT:', PORT);
+console.log('   BOT_TOKEN задан?', !!BOT_TOKEN ? 'ДА (есть)' : 'НЕТ (пусто!)');
 
-// Подключаем сессии, чтобы помнить выбор пользователя
-// Подключаем сессии
-// Добавьте defaultSession
+// ===== 3. Только после проверки создаём бота =====
+if (!BOT_TOKEN) {
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Переменная BOT_TOKEN не задана!');
+}
+const bot = new Telegraf(BOT_TOKEN);
+
+// ===== 4. Подключаем сессии =====
 bot.use(session({
-  defaultSession: () => ({ 
-    booking: {
-  defaultSession: () => ({ 
-    booking: {
-      bath: null,
-      date: null,
-      time: null,
-      hours: null,
-      kupel: null,
-      venik: null,
-      step: 'start'
-    }
-  })
+    defaultSession: () => ({
+        booking: {
+            bath: null,
+            date: null,
+            time: null,
+            hours: null,
+            kupel: null,
+            venik: null,
+            step: 'start'
+        }
+    })
 }));
-
 
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
