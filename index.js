@@ -606,12 +606,11 @@ bot.action('cancel_edit', async (ctx) => {
   await ctx.answerCbQuery('✖️ Отменено');
   await ctx.deleteMessage();
 });
-
 // Команда для админа
 bot.command('admin', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) {
     await ctx.reply('⛔ Доступ запрещён');
-    return;  // <- return БЕЗ значения, просто для выхода из функции
+    return;
   }
   
   await ctx.reply(
@@ -623,21 +622,8 @@ bot.command('admin', async (ctx) => {
     ]).resize()
   );
 });
-  if (ctx.from.id !== ADMIN_ID) {
-    return ctx.reply('⛔ Доступ запрещён');
-  }
-  
-  await ctx.reply(
-    'Панель администратора:',
-    Markup.keyboard([
-      ['📊 Статистика', '📋 Активные брони'],
-      ['⚙️ Настройки'],
-      ['🔙 В меню']
-    ]).resize()
-  );
-});
-// ===== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER =====
 
+// ===== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER =====
 app.use(express.json());
 
 // Обработчик для Healthcheck по пути "/"
