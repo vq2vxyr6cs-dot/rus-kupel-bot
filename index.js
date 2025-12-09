@@ -35,6 +35,9 @@ bot.use(session({
     })
 }));
 
+// ===== 5. Обязательно добавляем обработчик вебхука =====
+app.use(express.json());
+app.use(bot.webhookCallback('/webhook'));
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
     ctx.session.booking = {
