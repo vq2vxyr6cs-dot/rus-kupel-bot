@@ -449,6 +449,100 @@ bot.hears(['Дубовый веник', 'Берёзовый веник', 'Без
     confirmKeyboard()
   );
 });
+// ===== ОБРАБОТКА КНОПОК АДМИНА =====
+
+// 1. ✅ Подтверждение брони админом
+bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
+  const adminUsername = ctx.from.username || 'администратора';
+
+  await ctx.answerCbQuery('✅ Бронь подтверждена!');
+
+  // Обновляем сообщение у админа
+  await ctx.editMessageText(
+    ctx.callbackQuery.message.text + `\n\n✅ Подтверждено @${adminUsername}`,
+    { parse_mode: 'Markdown' }
+  );
+
+  // Уведомляем клиента
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      '✅ *Ваша бронь подтверждена администратором!*\n\nЖдем вас в указанное время.',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('Не удалось уведомить клиента:', error);
+  }
+});
+
+// 2. ❌ Отклонение брони админом
+bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
+  const adminUsername = ctx.from.username || 'администратора';
+
+  await ctx.answerCbQuery('❌ Бронь отклонена!');
+
+  // Обновляем сообщение у админа
+  await ctx.editMessageText(
+    ctx.callbackQuery.message.text + `\n\n❌ Отклонено @${adminUsername}`,
+    { parse_mode: 'Markdown' }
+  );
+
+  // Уведомляем клиента
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      '❌ *К сожалению, администратор отклонил вашу бронь.*\n\nПожалуйста, свяжитесь с нами для уточнения.',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('Не удалось уведомить клиента:', error);
+  }
+});
+
+// 3. ✏️ Редактирование брони админом
+bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
+
+  await ctx.answerCbQuery('Открываем меню редактирования...');
+
+  // Отправляем админу меню выбора поля для редактирования
+  await ctx.reply(
+    `Выберите, что хотите исправить в бронировании (ID клиента: ${userId}):`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📅 Дата и время', callback_data: `editDateTime_${userId}_${timestamp}` }],
+          [{ text: '🏠 Тип бани', callback_data: `editBath_${userId}_${timestamp}` }],
+          [{ text: '⏱ Часы', callback_data: `editHours_${userId}_${timestamp}` }],
+          [{ text: '↩️ Назад', callback_data: `backToView_${userId}_${timestamp}` }]
+        ]
+      }
+    }
+  );
+});
+
+// 4. 📞 Позвонить (показывает контактную информацию)
+bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery('Показываю контакты...');
+
+  await ctx.reply(
+    '📞 *Контактная информация:*\n\n' +
+    '• Телефон компании: +7 (XXX) XXX-XX-XX\n' +
+    '• Для связи с клиентом используйте кнопку "💬 Написать"',
+    { 
+      parse_mode: 'Markdown',
+      reply_to_message_id: ctx.callbackQuery.message.message_id
+    }
+  );
+});
+
+// ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
+// ... следующий уже существующий блок вашего кода ...
 
 // ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
 bot.on('text', async (ctx) => {
