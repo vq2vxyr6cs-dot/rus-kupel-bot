@@ -1,7 +1,7 @@
 import { Telegraf, Markup, session } from 'telegraf';
 import express from 'express';
 
-// ===== 1. Сначала создаём Express-приложение =====
+// ===== 1. Создаём Express-приложение =====
 const app = express();
 
 // ===== 2. Получаем токен и ВАЖНАЯ проверка =====
@@ -14,34 +14,34 @@ console.log('🔧 Проверка переменных:');
 console.log('   PORT:', PORT);
 console.log('   BOT_TOKEN задан?', !!BOT_TOKEN ? 'ДА (есть)' : 'НЕТ (пусто!)');
 
-// ===== 3. Создаём бота только если токен есть =====
-let bot;
-if (BOT_TOKEN) {
-    bot = new Telegraf(BOT_TOKEN);
-    console.log('✅ Бот создан с токеном');
-    
-    // ===== 4. Подключаем сессии =====
-    bot.use(session({
-        defaultSession: () => ({
-            booking: {
-                bath: null,
-                date: null,
-                time: null,
-                hours: null,
-                kupel: null,
-                venik: null,
-                step: 'start'
-            }
-        })
-    }));
-    
-    // ===== 5. Добавляем обработчик вебхука (ОДИН РАЗ!) =====
-    app.use(express.json());
-    app.use(bot.webhookCallback('/webhook')); // <-- ЭТО ЕДИНСТВЕННАЯ СТРОКА ВЕБХУКА
-    
-} else {
-    console.error('❌ Бот НЕ создан — нет токена. Сервер запустится, но бот не будет работать.');
+// ===== 3. Проверяем токен =====
+if (!BOT_TOKEN) {
+    console.error('❌ Бот НЕ создан — нет токена.');
+    console.error('   Добавьте BOT_TOKEN в переменные окружения Railway');
+    process.exit(1); // Завершаем приложение
 }
+
+// ===== 4. Создаём бота =====
+const bot = new Telegraf(BOT_TOKEN);
+console.log('✅ Бот создан с токеном');
+    
+// ===== 5. Подключаем сессии =====
+bot.use(session({
+    defaultSession: () => ({
+        booking: {
+            bath: null,
+            date: null,
+            time: null,
+            hours: null,
+            kupel: null,
+            venik: null,
+            step: 'start'
+        }
+    })
+}));
+// ===== 6. Добавляем обработчик вебхука =====
+app.use(express.json());
+app.use(bot.webhookCallback('/webhook'));
 
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
@@ -126,13 +126,32 @@ function bookingSummary(booking, user = null) {
   
   return summary;
 }
-// ===== ОБРАБОТЧИКИ КОМАНД =====
+// ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ =====
+// Безопасное обновление сообщений с Markdown разметкой
+function safeEditMessage(ctx, additionalText) {
+  // Получаем оригинальный текст из callbackQuery
+  const originalText = ctx.callbackQuery.message.text;
+  
+  // Очищаем от Markdown разметки (простой способ)
+  const cleanText = originalText
+    .replace(/\*/g, '')    // удаляем *
+    .replace(/_/g, '')     // удаляем _
+    .replace(/`/g, '')     // удаляем `
+    .replace(/\[/g, '')    // удаляем [ для ссылок
+    .replace(/\]/g, '')    // удаляем ] для ссылок
+    .replace(/\(/g, '')    // удаляем ( для ссылок
+    .replace(/\)/g, '');   // удаляем ) для ссылок
+  
+  // Возвращаем безопасный текст
+  return `${cleanText}\n\n${additionalText}`;
+}
 
+// ===== ОБРАБОТЧИКИ КОМАНД =====
 // /start
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.replyWithPhoto(
-   { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' }, // 
+   { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' },
     {
       caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
       reply_markup: mainKeyboard().reply_markup
@@ -394,16 +413,13 @@ bot.hears(['Дубовый веник', 'Берёзовый веник', 'Без
 // 1. ✅ Подтверждение брони админом
 bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
   const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('✅ Бронь подтверждена!');
 
-  // Обновляем сообщение у админа
-  await ctx.editMessageText(
-    ctx.callbackQuery.message.text + `\n\n✅ Подтверждено @${adminUsername}`,
-    { parse_mode: 'Markdown' }
-  );
+  // Обновляем сообщение безопасно
+  const newText = safeEditMessage(ctx, `✅ Подтверждено @${adminUsername}`);
+  await ctx.editMessageText(newText, { parse_mode: null });
 
   // Уведомляем клиента
   try {
@@ -420,22 +436,19 @@ bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
 // 2. ❌ Отклонение брони админом
 bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
   const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('❌ Бронь отклонена!');
 
-  // Обновляем сообщение у админа
-  await ctx.editMessageText(
-    ctx.callbackQuery.message.text + `\n\n❌ Отклонено @${adminUsername}`,
-    { parse_mode: 'Markdown' }
-  );
+  // Обновляем сообщение безопасно
+  const newText = safeEditMessage(ctx, `❌ Отклонено @${adminUsername}`);
+  await ctx.editMessageText(newText, { parse_mode: null });
 
   // Уведомляем клиента
   try {
     await ctx.telegram.sendMessage(
       userId,
-      '❌ *К сожалению, администратор отклонил вашу бронь.*\n\nПожалуйста, свяжитесь с нами для уточнения.',
+      '❌ *К сожалению, администратор отклонил вашу бронь.*\n\nПожалуйста, свяжитесь с нами для уточнения:\n📞 +7 (XXX) XXX-XX-XX',
       { parse_mode: 'Markdown' }
     );
   } catch (error) {
@@ -468,21 +481,17 @@ bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
 
 // 4. 📞 Позвонить (показывает контактную информацию)
 bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
-  await ctx.answerCbQuery('Показываю контакты...');
+  await ctx.answerCbQuery('📞 Показываю контакты...');
 
   await ctx.reply(
     '📞 *Контактная информация:*\n\n' +
     '• Телефон компании: +7 (XXX) XXX-XX-XX\n' +
     '• Для связи с клиентом используйте кнопку "💬 Написать"',
     { 
-      parse_mode: 'Markdown',
-      reply_to_message_id: ctx.callbackQuery.message.message_id
+      parse_mode: 'Markdown'
     }
   );
 });
-
-// ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
-// ... следующий уже существующий блок вашего кода ...
 
 // ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
 bot.on('text', async (ctx) => {
@@ -537,109 +546,7 @@ if (booking.step === 'time') {
   // На всякий случай — дефолт
   return ctx.reply('Нажмите «Забронировать», чтобы начать оформление.', mainKeyboard());
 });
-// ===== ОБРАБОТКА КНОПОК АДМИНА =====
 
-// Подтверждение брони админом
-bot.action(/confirm_(\d+)_(\d+)/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
-  
-  await ctx.answerCbQuery('✅ Бронь подтверждена!');
-  
-  // Обновляем сообщение
-  await ctx.editMessageText(
-    `${ctx.callbackQuery.message.text}\n\n✅ Подтверждено администратором @${ctx.from.username}`
-  );
-  
-  // Уведомляем пользователя
-  try {
-    await ctx.telegram.sendMessage(
-      userId,
-      '✅ *Ваша бронь подтверждена администратором!*\n\nЖдём вас в указанное время.\nПри необходимости с вами свяжется наш администратор.',
-      { parse_mode: 'Markdown' }
-    );
-  } catch (error) {
-    console.error('Не удалось уведомить пользователя:', error);
-  }
-});
-
-// Отклонение брони админом
-bot.action(/reject_(\d+)_(\d+)/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
-  
-  await ctx.answerCbQuery('❌ Бронь отклонена!');
-  
-  // Обновляем сообщение
-  await ctx.editMessageText(
-    `${ctx.callbackQuery.message.text}\n\n❌ Отклонено администратором @${ctx.from.username}`
-  );
-  
-  // Уведомляем пользователя
-  try {
-    await ctx.telegram.sendMessage(
-      userId,
-      '❌ *К сожалению, ваша бронь была отклонена.*\n\nПожалуйста, свяжитесь с нами для уточнения деталей:\n📞 +7 (XXX) XXX-XX-XX',
-      { parse_mode: 'Markdown' }
-    );
-  } catch (error) {
-    console.error('Не удалось уведомить пользователя:', error);
-  }
-});
-
-// Редактирование брони админом
-bot.action(/edit_(\d+)_(\d+)/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
-  
-  await ctx.answerCbQuery('✏️ Запрос на редактирование');
-  
-  // Предлагаем варианты редактирования
-  await ctx.reply(
-    'Что вы хотите исправить в бронировании?',
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '📅 Дата/время', callback_data: `edit_date_${userId}_${timestamp}` },
-            { text: '🏠 Баня', callback_data: `edit_bath_${userId}_${timestamp}` }
-          ],
-          [
-            { text: '⏱ Часы', callback_data: `edit_hours_${userId}_${timestamp}` },
-            { text: '💰 Услуги', callback_data: `edit_services_${userId}_${timestamp}` }
-          ],
-          [
-            { text: '📞 Контакты', callback_data: `edit_contacts_${userId}_${timestamp}` },
-            { text: '↩️ Назад', callback_data: `back_to_booking_${userId}_${timestamp}` }
-          ]
-        ]
-      }
-    }
-  );
-});
-
-// Кнопка "Позвонить" - показывает номер телефона
-bot.action(/call_(\d+)_(\d+)/, async (ctx) => {
-  await ctx.answerCbQuery('📞 Номер телефона');
-  
-  // Показываем номер телефона клиента (если он есть в базе)
-  // Или общий номер компании
-  await ctx.reply(
-    '📞 *Контактная информация:*\n\n' +
-    '• Телефон компании: +7 (XXX) XXX-XX-XX\n' +
-    '• Для связи с клиентом используйте кнопку "💬 Написать"',
-    { 
-      parse_mode: 'Markdown',
-      reply_to_message_id: ctx.callbackQuery.message.message_id
-    }
-  );
-});
-
-// Отмена редактирования
-bot.action('cancel_edit', async (ctx) => {
-  await ctx.answerCbQuery('✖️ Отменено');
-  await ctx.deleteMessage();
-});
 // Команда для админа
 bot.command('admin', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) {
@@ -657,25 +564,21 @@ bot.command('admin', async (ctx) => {
   );
 });
 
-// ===== ЗАПУСК БОТА И СЕРВЕРА ДЛЯ RENDER =====
-app.use(express.json());
+// ===== ЗАПУСК СЕРВЕРА =====
 
-// Обработчик для Healthcheck по пути "/"
+// Healthcheck для Railway
 app.get('/', (req, res) => {
-  res.send('OK'); // Railway ждёт любой успешный ответ (200 OK)
+  res.json({ 
+    status: 'OK', 
+    service: 'Telegram Bot API',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// ===== КРИТИЧЕСКИ ВАЖНЫЕ СТРОКИ =====
-// 1. Добавляем обработчик для вебхука Telegram
-app.use(bot.webhookCallback('/webhook'));
-// ИЛИ, если вы не используете webhookCallback:
-// app.post('/webhook', (req, res) => {
-//   bot.handleUpdate(req.body, res);
-// });
-
-// 2. Запускаем сервер на правильном интерфейсе и порту
+// Запускаем сервер
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
+  console.log(`🌐 Webhook доступен по адресу: /webhook`);
+  console.log(`🏥 Healthcheck: http://localhost:${PORT}/`);
+  console.log(`🤖 Бот готов к работе!`);
 });
-
-// 3. Запускаем бота. Если используем вебхук, то bot.launch() НЕ НУЖЕН.
