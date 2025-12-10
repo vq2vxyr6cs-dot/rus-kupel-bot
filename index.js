@@ -42,9 +42,7 @@ if (BOT_TOKEN) {
 } else {
     console.error('❌ Бот НЕ создан — нет токена. Сервер запустится, но бот не будет работать.');
 }
-// ===== 5. Обязательно добавляем обработчик вебхука =====
-app.use(express.json());
-app.use(bot.webhookCallback('/webhook'));
+
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
     ctx.session.booking = {
@@ -200,16 +198,7 @@ bot.hears('💰 Цены', async (ctx) => {
   );
 });
   
-  // Или, если нет картинки:
-  // await ctx.reply(
-  //   '💰 *Актуальные цены:*\n\n' +
-  //   '• Богатырская баня:1200,1500,2000 руб/час\n' +
-  //   '• Царь баня: 3500 руб/час\n' +
-  //   '• Купель:1000 руб (только к Богатырской на 2 часа)\n' +
-  //   '• Веник: 350-400 руб\n\n' +
-  //   'Минимальное время брони - 2 часа.',
-  //   { parse_mode: 'Markdown', ...mainKeyboard() }
-  // );
+  
 
 // Обработка кнопки "📍 Как добраться"
 bot.hears('📍 Как добраться', async (ctx) => {
@@ -248,103 +237,54 @@ bot.hears('✅ Забронировать', async (ctx) => {
   }
 
   // Если мы на шаге подтверждения — считаем, что бронь подтверждена
- // Если мы на шаге подтверждения — считаем, что бронь подтверждена
-if (step === 'confirm') {
-  booking.step = 'done';
-  ctx.session.booking = booking;
+  if (step === 'confirm') {
+    booking.step = 'done';
+    ctx.session.booking = booking;
 
-  // 1. Сообщение клиенту
-  await ctx.reply(
-    '🔥 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
-    mainKeyboard()
-  );
+    // 1. Сообщение клиенту
+    await ctx.reply(
+      '🔥 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
+      mainKeyboard()
+    );
 
-  // 2. Отправляем администратору
- // Примерное место (строки ~210-230):
-if (step === 'confirm') {
-  booking.step = 'done';
-  ctx.session.booking = booking;
-
-  // 1. Сообщение клиенту
-  await ctx.reply(
-    '🔥 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
-    mainKeyboard()
-  );
-
-  // 2. Отправляем администратору
-try {
-  const userInfo = ctx.from;
-  const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
-  
-  // Отправляем сообщение админу с кнопками
-  await ctx.telegram.sendMessage(
-    ADMIN_ID,
-    adminMessage,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-            { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-          ],
-          [
-            { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-            { text: '💬 Написать', url: `tg://user?id=${ctx.from.id}` }
-          ],
-          [
-            { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-          ]
-        ]
-      }
+    // 2. Отправляем администратору
+    try {
+      const userInfo = ctx.from;
+      const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
+      
+      // Отправляем сообщение админу с кнопками
+      await ctx.telegram.sendMessage(
+        ADMIN_ID,
+        adminMessage,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+                { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+              ],
+              [
+                { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+                { text: '💬 Написать', url: `tg://user?id=${ctx.from.id}` }
+              ],
+              [
+                { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
+              ]
+            ]
+          }
+        }
+      );
+      
+    } catch (error) {
+      console.error('Ошибка отправки админу:', error);
     }
-  );
-  
-} catch (error) {
-  console.error('Ошибка отправки админу:', error);
-}
-  // 3. Сбрасываем состояние
-  resetBooking(ctx);
-  return;
-}
+    
+    // 3. Сбрасываем состояние
+    resetBooking(ctx);
+    return;
+  }
 
-// 2. Отправляем администратору с кнопками действий
-try {
-  const userInfo = ctx.from;
-  const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
-  
-  // Отправляем сообщение админу с кнопками
-  await ctx.telegram.sendMessage(
-    ADMIN_ID,
-    adminMessage,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-            { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-          ],
-          [
-            { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-            { text: '💬 Написать', url: `tg://user?id=${ctx.from.id}` }
-          ],
-          [
-            { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-          ]
-        ]
-      }
-    }
-  );
-  
-} catch (error) {
-  console.error('Ошибка отправки админу:', error);
-}
-
-  // 3. Сбрасываем состояние
-  resetBooking(ctx);
-  return;
-}
   // На других шагах просим двигаться по логике
   return ctx.reply('Давайте сначала закончим текущую бронь 🙂');
 });
