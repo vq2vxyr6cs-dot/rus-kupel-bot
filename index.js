@@ -76,7 +76,7 @@ function mainKeyboard() {
 // Клавиатура выбора бани
 function bathKeyboard() {
   return Markup.keyboard([
-    ['🤴🏻 Царь баня', '🏋 Богатырская баня'],
+    [' Царь баня', ' Богатырская баня'],
     ['🔙 В меню']  // Изменили текст
   ]).resize();
 }
