@@ -347,6 +347,7 @@ bot.hears('✅ Забронировать', async (ctx) => {
       const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
       
   // Отправляем сообщение админу с кнопками
+// Отправляем сообщение админу с кнопками
 await ctx.telegram.sendMessage(
     ADMIN_ID,
     adminMessage,
@@ -360,7 +361,7 @@ await ctx.telegram.sendMessage(
                 ],
                 [
                     { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-                    { text: '💬 Открыть чат', url: `https://t.me/rukupel?start` } // ← ЗАМЕНИТЕ 'rukupel' на username вашего бота
+                    { text: '💬 Открыть бота', url: `https://t.me/Rrukupel_bot` }
                 ],
                 [
                     { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
@@ -368,9 +369,7 @@ await ctx.telegram.sendMessage(
             ]
         }
     }
-);
-      );
-      
+); // ← Эта скобка закрывает sendMessage    
     } catch (error) {
       console.error('Ошибка отправки админу:', error);
     }
