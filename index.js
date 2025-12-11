@@ -599,7 +599,7 @@ bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
 
   // Безопасное обновление сообщения
   const originalText = ctx.callbackQuery.message.text || '';
-  const newText = originalText + `\n\n✅ Подтверждено @${adminUsername}`;
+ const newText = safeEditMessage(ctx, `✅ Подтверждено @${adminUsername}`);
   
   try {
     await ctx.editMessageText(newText);
