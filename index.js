@@ -46,14 +46,22 @@ app.use(bot.webhookCallback('/webhook'));
 // ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
 function resetBooking(ctx) {
     ctx.session.booking = {
-        bath: null,     // баня
-        date: null,     // дата
-        time: null,     // время начала
-        hours: null,    // длительность
-        kupel: null,    // купель
-        venik: null,    // веник
-        step: 'start'   // текущий шаг
+        bath: null,
+        date: null,
+        time: null,
+        hours: null,
+        kupel: null,
+        venik: initVenikSession(), // ИЗМЕНЕНИЕ ЗДЕСЬ
+        step: 'start'
     };
+}
+// Инициализация веников в сессии
+function initVenikSession() {
+  return {
+    dub: { type: 'Дубовый', count: 0, price: 400 },
+    bereza: { type: 'Берёзовый', count: 0, price: 400 },
+    step: 'select' // 'select' → 'quantity' → 'confirm'
+  };
 }
 // Главная клавиатура
 function mainKeyboard() {
@@ -90,13 +98,59 @@ function kupelKeyboard() {
   ]).resize();
 }
 
-// Клавиатура веника
-function venikKeyboard() {
+// Клавиатура выбора веников (обновленная)
+function venikKeyboard(venikSession = null) {
+  // Если у нас уже есть данные о выбранных вениках, показываем итог
+  if (venikSession && venikSession.step === 'confirm') {
+    const venikSummary = getVenikSummary(venikSession);
+    return Markup.keyboard([
+      ['✅ Подтвердить веники'],
+      ['✏️ Изменить веники'],
+      ['🚫 Без веников']
+    ]).resize();
+  }
+  
+  // Основная клавиатура выбора
   return Markup.keyboard([
-    ['Дубовый веник', 'Берёзовый веник'],
-    ['Без веника'],
-    ['🔙 Назад']
+    ['🌳 Дубовый веник', '🌿 Берёзовый веник'],
+    ['📊 Посмотреть выбор', '✅ Готово'],
+    ['🚫 Без веников']
   ]).resize();
+}
+
+// Клавиатура выбора количества
+function venikQuantityKeyboard() {
+  return Markup.keyboard([
+    ['1 шт', '2 шт', '3 шт', '4 шт'],
+    ['↩️ Назад к выбору типа']
+  ]).resize();
+}
+
+// Функция для получения текста сводки по веникам
+function getVenikSummary(venikSession) {
+  let summary = '📊 *Ваш выбор веников:*\n';
+  let totalCount = 0;
+  let totalPrice = 0;
+  
+  if (venikSession.dub.count > 0) {
+    summary += `• ${venikSession.dub.type}: ${venikSession.dub.count} шт. (${venikSession.dub.price * venikSession.dub.count} руб)\n`;
+    totalCount += venikSession.dub.count;
+    totalPrice += venikSession.dub.price * venikSession.dub.count;
+  }
+  
+  if (venikSession.bereza.count > 0) {
+    summary += `• ${venikSession.bereza.type}: ${venikSession.bereza.count} шт. (${venikSession.bereza.price * venikSession.bereza.count} руб)\n`;
+    totalCount += venikSession.bereza.count;
+    totalPrice += venikSession.bereza.price * venikSession.bereza.count;
+  }
+  
+  if (totalCount === 0) {
+    summary += '• Веники не выбраны\n';
+  } else {
+    summary += `\n*Итого:* ${totalCount} шт. на сумму ${totalPrice} руб`;
+  }
+  
+  return summary;
 }
 
 // Клавиатура подтверждения
@@ -116,12 +170,10 @@ function bookingSummary(booking, user = null) {
   summary += `• Время: ${booking.time}\n`;
   summary += `• Часов: ${booking.hours}\n`;
   
-  // НОВАЯ ЛОГИКА ДЛЯ КУПЕЛИ
+  // Логика для купели
   if (booking.bath === 'Царь баня') {
-    // Для Царь-бани купель всегда включена
     summary += `• Купель: включена\n`;
   } else if (booking.bath === 'Богатырская баня') {
-    // Для Богатырской: если 3+ часов или выбрана купель
     const hoursNum = parseInt(booking.hours) || 0;
     if (hoursNum >= 3 || booking.kupel === 'да') {
       summary += `• Купель: включена\n`;
@@ -130,7 +182,16 @@ function bookingSummary(booking, user = null) {
     }
   }
   
-  summary += `• Веник: ${booking.venik || 'нет'}\n`;
+  // ОТОБРАЖЕНИЕ ВЕНИКОВ
+  summary += `\n📊 *ВЕНИКИ:*\n`;
+  if (booking.venik) {
+    const venikSummary = getVenikSummary(booking.venik);
+    // Убираем первую строку из getVenikSummary, т.к. у нас уже есть заголовок
+    const lines = venikSummary.split('\n');
+    summary += lines.slice(1).join('\n');
+  } else {
+    summary += '• Веники не выбраны\n';
+  }
   
   if (user) {
     summary += `\n👤 *КЛИЕНТ:* ${user.first_name}`;
@@ -409,27 +470,122 @@ bot.hears(['Да, добавить купель', 'Без купели'], async 
 });
 
 // Выбор веника
-bot.hears(['Дубовый веник', 'Берёзовый веник', 'Без веника'], async (ctx) => {
+// 1. Начало выбора веника (выбор типа)
+bot.hears(['🌳 Дубовый веник', '🌿 Берёзовый веник'], async (ctx) => {
+  const booking = ctx.session.booking || {};
+  if (booking.step !== 'venik' || !booking.venik) {
+    return;
+  }
+
+  // Определяем тип веника
+  const venikType = ctx.message.text.includes('Дубовый') ? 'dub' : 'bereza';
+  booking.venik.selectedType = venikType;
+  booking.venik.step = 'quantity';
+  ctx.session.booking = booking;
+
+  await ctx.reply(
+    `Сколько ${venikType === 'dub' ? 'дубовых' : 'берёзовых'} веников добавить? (можно от 1 до 4)`,
+    venikQuantityKeyboard()
+  );
+});
+
+// 2. Выбор количества
+bot.hears(['1 шт', '2 шт', '3 шт', '4 шт'], async (ctx) => {
+  const booking = ctx.session.booking || {};
+  if (booking.step !== 'venik' || !booking.venik || booking.venik.step !== 'quantity') {
+    return;
+  }
+
+  const count = parseInt(ctx.message.text);
+  const venikType = booking.venik.selectedType;
+  
+  // Обновляем количество
+  if (venikType === 'dub') {
+    booking.venik.dub.count = count;
+  } else if (venikType === 'bereza') {
+    booking.venik.bereza.count = count;
+  }
+  
+  booking.venik.step = 'select';
+  ctx.session.booking = booking;
+
+  // Показываем текущий выбор
+  const summary = getVenikSummary(booking.venik);
+  await ctx.reply(
+    `${summary}\n\nПродолжайте выбирать веники или нажмите "✅ Готово"`,
+    venikKeyboard(booking.venik)
+  );
+});
+
+// 3. Управление выбором
+bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ Изменить веники', '🚫 Без веников', '↩️ Назад к выбору типа'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'venik') {
     return;
   }
 
-  if (ctx.message.text === 'Без веника') {
-    booking.venik = 'нет';
-  } else {
-    booking.venik = ctx.message.text;
+  const action = ctx.message.text;
+
+  if (action === '📊 Посмотреть выбор') {
+    const summary = getVenikSummary(booking.venik);
+    await ctx.reply(summary, { parse_mode: 'Markdown' });
+    return;
   }
 
-  booking.step = 'confirm';
-  ctx.session.booking = booking;
+  if (action === '✅ Готово' || action === '✅ Подтвердить веники') {
+    // Завершаем выбор веников
+    booking.venik.step = 'confirm';
+    ctx.session.booking = booking;
+    
+    const summary = getVenikSummary(booking.venik);
+    await ctx.reply(
+      `${summary}\n\nВыбор веников завершен!`,
+      venikKeyboard(booking.venik)
+    );
+    
+    // Переходим к подтверждению всей брони
+    booking.step = 'confirm';
+    ctx.session.booking = booking;
+    
+    const totalSummary = bookingSummary(booking);
+    await ctx.reply(
+      totalSummary + '\n\nЕсли всё верно — нажмите «Забронировать».\nЧтобы изменить — нажмите «Изменить».',
+      confirmKeyboard()
+    );
+    return;
+  }
 
-  const summary = bookingSummary(booking);
+  if (action === '✏️ Изменить веники') {
+    booking.venik.step = 'select';
+    ctx.session.booking = booking;
+    await ctx.reply('Выберите веники:', venikKeyboard());
+    return;
+  }
 
-  await ctx.reply(
-    summary + '\n\nЕсли всё верно — нажмите «Забронировать».\nЧтобы изменить — нажмите «Изменить».',
-    confirmKeyboard()
-  );
+  if (action === '🚫 Без веников') {
+    // Сбрасываем все веники
+    booking.venik = initVenikSession();
+    booking.venik.step = 'confirm';
+    ctx.session.booking = booking;
+    
+    // Переходим к подтверждению всей брони
+    booking.step = 'confirm';
+    ctx.session.booking = booking;
+    
+    const totalSummary = bookingSummary(booking);
+    await ctx.reply(
+      totalSummary + '\n\nЕсли всё верно — нажмите «Забронировать».\nЧтобы изменить — нажмите «Изменить».',
+      confirmKeyboard()
+    );
+    return;
+  }
+
+  if (action === '↩️ Назад к выбору типа') {
+    booking.venik.step = 'select';
+    ctx.session.booking = booking;
+    await ctx.reply('Выберите тип веника:', venikKeyboard());
+    return;
+  }
 });
 // ===== ОБРАБОТКА КНОПОК АДМИНА =====
 
