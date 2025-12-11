@@ -346,28 +346,29 @@ bot.hears('✅ Забронировать', async (ctx) => {
       const userInfo = ctx.from;
       const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
       
-      // Отправляем сообщение админу с кнопками
-      await ctx.telegram.sendMessage(
-        ADMIN_ID,
-        adminMessage,
-        {
-          parse_mode: 'Markdown',
-          reply_markup: {
+  // Отправляем сообщение админу с кнопками
+await ctx.telegram.sendMessage(
+    ADMIN_ID,
+    adminMessage,
+    {
+        parse_mode: 'HTML',
+        reply_markup: {
             inline_keyboard: [
-              [
-                { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-                { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-              ],
-              [
-                { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-                { text: '💬 Написать', url: `tg://user?id=${ctx.from.id}` }
-              ],
-              [
-                { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-              ]
+                [
+                    { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+                    { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+                ],
+                [
+                    { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+                    { text: '💬 Открыть чат', url: `https://t.me/rukupel?start` } // ← ЗАМЕНИТЕ 'rukupel' на username вашего бота
+                ],
+                [
+                    { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
+                ]
             ]
-          }
         }
+    }
+);
       );
       
     } catch (error) {
@@ -589,32 +590,41 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
 });
 // ===== ОБРАБОТКА КНОПОК АДМИНА =====
 
-// 1. ✅ Подтверждение брони админом
-bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];           // ID клиента
-  const timestamp = ctx.match[2];        // Временная метка
-  const adminUsername = ctx.from.username || 'администратора';
-
-  await ctx.answerCbQuery('✅ Бронь подтверждена!');
-
-  // Безопасное обновление сообщения
-  const originalText = ctx.callbackQuery.message.text || '';
-  const newText = originalText + `\n\n✅ Подтверждено @${adminUsername}`;
-  
+// 2. Отправляем администратору
   try {
-    await ctx.editMessageText(newText);
-  } catch (editError) {
-    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
-  }
-
-  // Уведомляем клиента
-  try {
+    const userInfo = ctx.from;
+    const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
+    
+    // Имя вашего бота
+    const botUsername = 'Rrukupel_bot';
+    
+    // Отправляем сообщение админу с кнопками
     await ctx.telegram.sendMessage(
-      userId,
-      '✅ *Ваша бронь подтверждена администратором!*\n\nЖдем вас в указанное время.',
-      { parse_mode: 'Markdown' }
+      ADMIN_ID,
+      adminMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+              { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+            ],
+            [
+              { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+              { text: '💬 Открыть бота', url: `https://t.me/${botUsername}` }
+            ],
+            [
+              { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
+            ]
+          ]
+        }
+      }
     );
+    
   } catch (error) {
+    console.error('Ошибка отправки админу:', error);
+  }
     console.error('Не удалось уведомить клиента:', error);
   }
 });
