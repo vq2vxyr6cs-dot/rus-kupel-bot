@@ -115,7 +115,21 @@ function bookingSummary(booking, user = null) {
   summary += `• Дата: ${booking.date}\n`;
   summary += `• Время: ${booking.time}\n`;
   summary += `• Часов: ${booking.hours}\n`;
-  summary += `• Купель: ${booking.kupel || 'нет'}\n`;
+  
+  // НОВАЯ ЛОГИКА ДЛЯ КУПЕЛИ
+  if (booking.bath === 'Царь баня') {
+    // Для Царь-бани купель всегда включена
+    summary += `• Купель: включена\n`;
+  } else if (booking.bath === 'Богатырская баня') {
+    // Для Богатырской: если 3+ часов или выбрана купель
+    const hoursNum = parseInt(booking.hours) || 0;
+    if (hoursNum >= 3 || booking.kupel === 'да') {
+      summary += `• Купель: включена\n`;
+    } else {
+      summary += `• Купель: ${booking.kupel || 'нет'}\n`;
+    }
+  }
+  
   summary += `• Веник: ${booking.venik || 'нет'}\n`;
   
   if (user) {
@@ -346,7 +360,7 @@ bot.hears('🔙 Назад', async (ctx) => {
   }
 });
 
-// Выбор количества часов
+// Выбор количества часов (ОБНОВЛЕННАЯ ЛОГИКА)
 bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'hours') {
@@ -354,24 +368,33 @@ bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (c
   }
 
   booking.hours = ctx.message.text;
+  const hoursNum = parseInt(booking.hours) || 0;
   ctx.session.booking = booking;
 
-  // Если Богатырская баня и 2 часа — предлагаем купель
-  if (booking.bath === 'Богатырская баня' && booking.hours === '2 часа') {
-    booking.step = 'kupel';
+  // НОВАЯ ЛОГИКА: проверяем баню и количество часов
+  if (booking.bath === 'Богатырская баня') {
+    if (hoursNum < 3) {
+      // Меньше 3 часов — спрашиваем про купель
+      booking.step = 'kupel';
+      ctx.session.booking = booking;
+      return ctx.reply('Добавить купель?', kupelKeyboard());
+    } else {
+      // 3+ часов — купель автоматически включена
+      booking.kupel = 'да (автоматически)';
+      booking.step = 'venik';
+      ctx.session.booking = booking;
+      return ctx.reply('✅ Купель автоматически включена (от 3-х часов).\n\nВыберите вариант веника:', venikKeyboard());
+    }
+  } else if (booking.bath === 'Царь баня') {
+    // Для Царь-бани купель всегда включена, переходим к веникам
+    booking.kupel = 'включена';
+    booking.step = 'venik';
     ctx.session.booking = booking;
-    return ctx.reply('Добавить купель?', kupelKeyboard());
+    return ctx.reply('Выберите вариант веника:', venikKeyboard());
   }
-
-  // Иначе сразу переходим к веникам
-  booking.kupel = booking.kupel || 'нет';
-  booking.step = 'venik';
-  ctx.session.booking = booking;
-
-  return ctx.reply('Выберите вариант веника:', venikKeyboard());
 });
 
-// Выбор купели
+// Выбор купели (актуально только для Богатырской < 3 часов)
 bot.hears(['Да, добавить купель', 'Без купели'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'kupel') {
