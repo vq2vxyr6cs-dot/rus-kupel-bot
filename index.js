@@ -690,8 +690,7 @@ bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
 });
 
 // 5. Вспомогательная функция для безопасного редактирования сообщений
-function safeEditMessage(ctx, suffix) {
-  const originalText = ctx.callbackQuery.message.text || '';
+
   // Удаляем Markdown разметку, если она есть, чтобы избежать ошибок
   const cleanText = originalText.replace(/\*/g, '');
   return cleanText + `\n\n${suffix}`;
