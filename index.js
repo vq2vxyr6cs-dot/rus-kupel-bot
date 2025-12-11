@@ -161,7 +161,6 @@ function confirmKeyboard() {
   ]).resize();
 }
 
-// Текст итоговой брони
 // Текст итоговой брони (для пользователя и админа)
 function bookingSummary(booking, user = null) {
   let summary = '🧾 *ВАША БРОНЬ:*\n';
@@ -247,7 +246,7 @@ bot.hears('👀 Обзор бань', async (ctx) => {
 // Обзор Богатырской бани
 bot.hears('🎥 Богатырская баня', async (ctx) => {
   await ctx.reply(
-  'https://t.me/rukupel/4/', // ← ДОБАВЬТЕ ЗАПЯТУЮ ЗДЕСЬ!
+  'https://t.me/rukupel/4/', // 
   {
     caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
     reply_markup: Markup.inlineKeyboard([
@@ -341,39 +340,38 @@ bot.hears('✅ Забронировать', async (ctx) => {
       mainKeyboard()
     );
 
-    // 2. Отправляем администратору
+// 2. Отправляем администратору
     try {
       const userInfo = ctx.from;
       const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
       
-  // Отправляем сообщение админу с кнопками
-// Отправляем сообщение админу с кнопками
-await ctx.telegram.sendMessage(
-    ADMIN_ID,
-    adminMessage,
-    {
-        parse_mode: 'HTML',
-        reply_markup: {
+      // Отправляем сообщение админу с кнопками
+      await ctx.telegram.sendMessage(
+        ADMIN_ID,
+        adminMessage,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
             inline_keyboard: [
-                [
-                    { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-                    { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-                ],
-                [
-                    { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-                    { text: '💬 Открыть бота', url: `https://t.me/Rrukupel_bot` }
-                ],
-                [
-                    { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-                ]
+              [
+                { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+                { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+              ],
+              [
+                { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+                { text: '💬 Открыть бота', url: `https://t.me/Rrukupel_bot` }
+              ],
+              [
+                { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
+              ]
             ]
+          }
         }
-    }
-); // ← Эта скобка закрывает sendMessage    
+      );
+      
     } catch (error) {
       console.error('Ошибка отправки админу:', error);
     }
-    
     // 3. Сбрасываем состояние
     resetBooking(ctx);
     return;
@@ -588,51 +586,43 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
     return;
   }
 });
+
 // ===== ОБРАБОТКА КНОПОК АДМИНА =====
 
-// 2. Отправляем администратору
+// 1. ✅ Подтверждение брони админом
+bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
+  const adminUsername = ctx.from.username || 'администратора';
+
+  await ctx.answerCbQuery('✅ Бронь подтверждена!');
+
+  // Безопасное обновление сообщения
+  const originalText = ctx.callbackQuery.message.text || '';
+  const newText = originalText + `\n\n✅ Подтверждено @${adminUsername}`;
+  
   try {
-    const userInfo = ctx.from;
-    const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
-    
-    // Имя вашего бота
-    const botUsername = 'Rrukupel_bot';
-    
-    // Отправляем сообщение админу с кнопками
-    await ctx.telegram.sendMessage(
-      ADMIN_ID,
-      adminMessage,
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-              { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-            ],
-            [
-              { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-              { text: '💬 Открыть бота', url: `https://t.me/${botUsername}` }
-            ],
-            [
-              { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-            ]
-          ]
-        }
-      }
-    );
-    
-  } catch (error) {
-    console.error('Ошибка отправки админу:', error);
+    await ctx.editMessageText(newText);
+  } catch (editError) {
+    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
   }
+
+  // Уведомляем клиента
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      '✅ *Ваша бронь подтверждена администратором!*\n\nЖдем вас в указанное время.',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
     console.error('Не удалось уведомить клиента:', error);
   }
 });
 
-// 2. ❌ Отклонение брони админом (ИСПРАВЛЕНО - добавлен timestamp)
+// 2. ❌ Отклонение брони админом
 bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];           // ID клиента  
-  const timestamp = ctx.match[2];        // Временная метка (ДОБАВЛЕНО)
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('❌ Бронь отклонена!');
@@ -661,8 +651,8 @@ bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
 
 // 3. ✏️ Редактирование брони админом
 bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];           // ID клиента
-  const timestamp = ctx.match[2];        // Временная метка
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
 
   await ctx.answerCbQuery('Открываем меню редактирования...');
 
@@ -684,8 +674,8 @@ bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
 
 // 4. 📞 Позвонить (показывает контактную информацию)
 bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];           // ID клиента
-  const timestamp = ctx.match[2];        // Временная метка
+  const userId = ctx.match[1];
+  const timestamp = ctx.match[2];
 
   await ctx.answerCbQuery('📞 Показываю контакты...');
 
@@ -698,13 +688,6 @@ bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
     }
   );
 });
-
-// 5. Вспомогательная функция для безопасного редактирования сообщений
-
-  // Удаляем Markdown разметку, если она есть, чтобы избежать ошибок
-  const cleanText = originalText.replace(/\*/g, '');
-  return cleanText + `\n\n${suffix}`;
-}
 // ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
 bot.on('text', async (ctx) => {
   const text = ctx.message.text;
