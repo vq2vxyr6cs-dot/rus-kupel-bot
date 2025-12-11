@@ -412,14 +412,21 @@ bot.hears(['Дубовый веник', 'Берёзовый веник', 'Без
 
 // 1. ✅ Подтверждение брони админом
 bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];
+  const userId = ctx.match[1];           // ID клиента
+  const timestamp = ctx.match[2];        // Временная метка
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('✅ Бронь подтверждена!');
 
-  // Обновляем сообщение безопасно
-  const newText = safeEditMessage(ctx, `✅ Подтверждено @${adminUsername}`);
-  await ctx.editMessageText(newText, { parse_mode: null });
+  // Безопасное обновление сообщения
+  const originalText = ctx.callbackQuery.message.text || '';
+  const newText = originalText + `\n\n✅ Подтверждено @${adminUsername}`;
+  
+  try {
+    await ctx.editMessageText(newText);
+  } catch (editError) {
+    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
+  }
 
   // Уведомляем клиента
   try {
@@ -433,16 +440,23 @@ bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
   }
 });
 
-// 2. ❌ Отклонение брони админом
+// 2. ❌ Отклонение брони админом (ИСПРАВЛЕНО - добавлен timestamp)
 bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];
+  const userId = ctx.match[1];           // ID клиента  
+  const timestamp = ctx.match[2];        // Временная метка (ДОБАВЛЕНО)
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('❌ Бронь отклонена!');
 
-  // Обновляем сообщение безопасно
-  const newText = safeEditMessage(ctx, `❌ Отклонено @${adminUsername}`);
-  await ctx.editMessageText(newText, { parse_mode: null });
+  // Безопасное обновление сообщения
+  const originalText = ctx.callbackQuery.message.text || '';
+  const newText = originalText + `\n\n❌ Отклонено @${adminUsername}`;
+  
+  try {
+    await ctx.editMessageText(newText);
+  } catch (editError) {
+    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
+  }
 
   // Уведомляем клиента
   try {
@@ -458,21 +472,21 @@ bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
 
 // 3. ✏️ Редактирование брони админом
 bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
+  const userId = ctx.match[1];           // ID клиента
+  const timestamp = ctx.match[2];        // Временная метка
 
   await ctx.answerCbQuery('Открываем меню редактирования...');
 
   // Отправляем админу меню выбора поля для редактирования
   await ctx.reply(
-    `Выберите, что хотите исправить в бронировании (ID клиента: ${userId}):`,
+    `Выберите, что хотите исправить в бронировании клиента (ID: ${userId}):`,
     {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📅 Дата и время', callback_data: `editDateTime_${userId}_${timestamp}` }],
-          [{ text: '🏠 Тип бани', callback_data: `editBath_${userId}_${timestamp}` }],
-          [{ text: '⏱ Часы', callback_data: `editHours_${userId}_${timestamp}` }],
-          [{ text: '↩️ Назад', callback_data: `backToView_${userId}_${timestamp}` }]
+          [{ text: '📅 Дата и время', callback_data: `edit_date_${userId}_${timestamp}` }],
+          [{ text: '🏠 Тип бани', callback_data: `edit_bath_${userId}_${timestamp}` }],
+          [{ text: '⏱ Часы', callback_data: `edit_hours_${userId}_${timestamp}` }],
+          [{ text: '↩️ Назад к просмотру', callback_data: `back_to_view_${userId}_${timestamp}` }]
         ]
       }
     }
@@ -481,6 +495,9 @@ bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
 
 // 4. 📞 Позвонить (показывает контактную информацию)
 bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];           // ID клиента
+  const timestamp = ctx.match[2];        // Временная метка
+
   await ctx.answerCbQuery('📞 Показываю контакты...');
 
   await ctx.reply(
@@ -493,6 +510,13 @@ bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
   );
 });
 
+// 5. Вспомогательная функция для безопасного редактирования сообщений
+function safeEditMessage(ctx, suffix) {
+  const originalText = ctx.callbackQuery.message.text || '';
+  // Удаляем Markdown разметку, если она есть, чтобы избежать ошибок
+  const cleanText = originalText.replace(/\*/g, '');
+  return cleanText + `\n\n${suffix}`;
+}
 // ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
 bot.on('text', async (ctx) => {
   const text = ctx.message.text;
