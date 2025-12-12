@@ -59,7 +59,7 @@ function resetBooking(ctx) {
 function initVenikSession() {
   return {
     dub: { type: 'Дубовый', count: 0, price: 400 },
-    bereza: { type: 'Берёзовый', count: 0, price: 400 },
+    bereza: { type: 'Берёзовый', count: 0, price: 350 },
     step: 'select' // 'select' → 'quantity' → 'confirm'
   };
 }
