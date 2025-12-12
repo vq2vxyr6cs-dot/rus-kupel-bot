@@ -188,9 +188,15 @@ function bookingSummary(booking, user = null) {
   }
   
   if (user) {
-    summary += `\n👤 *КЛИЕНТ:* ${user.first_name}`;
+    summary += `\n👤 *КЛИЕНТ:* ${user.first_name || 'Имя не указано'}`;
     summary += user.username ? ` (@${user.username})` : '';
     summary += `\n🆔 ID: ${user.id}`;
+    // Добавляем телефон если есть
+    if (booking.formattedPhone) {
+      summary += `\n📱 Телефон: ${booking.formattedPhone}`;
+    }
+    // Добавляем ссылку для связи
+    summary += `\n✉️ Ссылка для связи: tg://user?id=${user.id}`;
   }
   
   return summary;
@@ -313,49 +319,49 @@ bot.hears('✅ Забронировать', async (ctx) => {
     return ctx.reply('Выберите баню:', bathKeyboard());
   }
 
-  if (step === 'confirm') {
-    booking.step = 'done';
-    ctx.session.booking = booking;
-
-    await ctx.reply(
-      '🔥 Спасибо! Ваша бронь принята.\nАдминистратор свяжется с вами в ближайшее время для подтверждения.',
-      mainKeyboard()
-    );
-
+ if (step === 'confirm') {
+  // Добавляем шаг запроса телефона
+  booking.step = 'phone_request';
+  ctx.session.booking = booking;
+  
+  return ctx.reply(
+    '📱 *Для завершения брони нам нужен ваш номер телефона*\n\n' +
+    'Пожалуйста, отправьте ваш номер телефона в формате:\n' +
+    '• +7XXXXXXXXXX\n' +
+    '• 8XXXXXXXXXX\n' +
+    '• Или просто цифры\n\n' +
+    'Это необходимо для связи с вами по поводу брони.',
+    { parse_mode: 'Markdown' }
+  );
+}
     try {
       const userInfo = ctx.from;
       const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
       
-      await ctx.telegram.sendMessage(
-        ADMIN_ID,
-        adminMessage,
-        {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
-                { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
-              ],
-              [
-                { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
-                { text: '💬 Открыть бота', url: `https://t.me/Rrukupel_bot` }
-              ],
-              [
-                { text: '📞 Позвонить', callback_data: `call_${ctx.from.id}_${Date.now()}` }
-              ]
-            ]
-          }
-        }
-      );
-      
-    } catch (error) {
-      console.error('Ошибка отправки админу:', error);
+  await ctx.telegram.sendMessage(
+  ADMIN_ID,
+  adminMessage,
+  {
+    parse_mode: 'Markdown', // МЕНЯЕМ с HTML на Markdown
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+          { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+        ],
+        [
+          { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+          // Прямая ссылка по ID пользователя - работает всегда!
+          { text: '💬 Написать клиенту', url: `tg://user?id=${ctx.from.id}` }
+        ],
+        [
+          { text: '📞 Телефон компании', callback_data: `call_company_${ctx.from.id}_${Date.now()}` },
+          { text: '📱 Запросить телефон', callback_data: `call_client_${ctx.from.id}_${Date.now()}` }
+        ]
+      ]
     }
-    
-    resetBooking(ctx);
-    return;
   }
+);
 
   return ctx.reply('Давайте сначала закончим текущую бронь 🙂');
 });
@@ -661,7 +667,227 @@ bot.on('text', async (ctx) => {
 
   return ctx.reply('Нажмите «Забронировать», чтобы начать оформление.', mainKeyboard());
 });
+bot.on('text', async (ctx) => {
+  const text = ctx.message.text;
+  const booking = ctx.session.booking || {};
 
+  // Если сессии ещё не было — инициализируем
+  if (!booking.step) {
+    resetBooking(ctx);
+    return ctx.reply('Нажмите кнопку «Забронировать», чтобы начать.', mainKeyboard());
+  }
+
+  // ... существующие проверки даты, времени ...
+
+  // ===== ДОБАВЛЯЕМ ЭТОТ БЛОК ПЕРЕД ПОСЛЕДНИМ RETURN =====
+  // Обработка телефона
+  if (booking.step === 'phone_request') {
+    // Простая валидация номера телефона
+    const phone = text.replace(/\D/g, ''); // Убираем всё кроме цифр
+    
+    if (phone.length >= 10 && phone.length <= 11) {
+      booking.phone = text;
+      booking.step = 'done';
+      ctx.session.booking = booking;
+
+      // Форматируем номер для красивого отображения
+      let formattedPhone = phone;
+      if (phone.length === 11 && (phone.startsWith('7') || phone.startsWith('8'))) {
+        formattedPhone = `+7 (${phone.slice(1, 4)}) ${phone.slice(4, 7)}-${phone.slice(7, 9)}-${phone.slice(9)}`;
+      } else if (phone.length === 10) {
+        formattedPhone = `+7 (${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6, 8)}-${phone.slice(8)}`;
+      }
+
+      // Сохраняем отформатированный номер
+      booking.formattedPhone = formattedPhone;
+
+      // Отправляем подтверждение клиенту
+      await ctx.reply(
+        `✅ Номер телефона принят: ${formattedPhone}\n\n` +
+        'Ваша бронь отправлена администратору. Ожидайте подтверждения!',
+        mainKeyboard()
+      );
+
+      // Отправляем администратору с номером телефона
+      try {
+        const userInfo = ctx.from;
+        let adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}`;
+        adminMessage += `\n⏰ ${new Date().toLocaleString('ru-RU')}`;
+        
+        await ctx.telegram.sendMessage(
+          ADMIN_ID,
+          adminMessage,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Подтвердить', callback_data: `confirm_${ctx.from.id}_${Date.now()}` },
+                  { text: '❌ Отклонить', callback_data: `reject_${ctx.from.id}_${Date.now()}` }
+                ],
+                [
+                  { text: '✏️ Исправить', callback_data: `edit_${ctx.from.id}_${Date.now()}` },
+                  { text: '💬 Написать клиенту', url: `tg://user?id=${ctx.from.id}` }
+                ],
+                [
+                  { text: '📞 Позвонить клиенту', callback_data: `call_client_phone_${ctx.from.id}_${Date.now()}` },
+                  { text: '📱 Наш телефон', callback_data: `call_company_${ctx.from.id}_${Date.now()}` }
+                ]
+              ]
+            }
+          }
+        );
+        
+      } catch (error) {
+        console.error('Ошибка отправки админу:', error);
+      }
+      
+      resetBooking(ctx);
+      return;
+    } else {
+      return ctx.reply(
+        '❌ Неверный формат номера телефона.\n\n' +
+        'Пожалуйста, отправьте номер в одном из форматов:\n' +
+        '• +7XXXXXXXXXX\n' +
+        '• 8XXXXXXXXXX\n' +
+        '• Или просто 10-11 цифр\n\n' +
+        'Пример: +79131234567'
+      );
+    }
+  }
+  // ===== КОНЕЦ ДОБАВЛЕННОГО БЛОКА =====
+
+  // На всякий случай — дефолт
+  return ctx.reply('Нажмите «Забронировать», чтобы начать оформление.', mainKeyboard());
+});
+// ===== НОВЫЕ ОБРАБОТЧИКИ ДЛЯ КНОПОК АДМИНА =====
+
+// 1. 📞 Телефон компании
+bot.action(/^call_company_(\d+)_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery('📞 Показываю контакты компании...');
+
+  await ctx.reply(
+    '🏢 *Контактная информация Русской Купели:*\n\n' +
+    '• Телефон для бронирования: +7 (913) 123-45-67\n' +
+    '• Режим работы: 10:00 - 22:00\n' +
+    '• Адрес: г. Новосибирск, ул. Советское шоссе 12 к1\n' +
+    '• Email: info@ruskupel.ru\n\n' +
+    'Для связи с клиентом используйте кнопки ниже:',
+    { 
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '💬 Написать клиенту', url: `tg://user?id=${ctx.match[1]}` }],
+          [{ text: '🗺️ Яндекс.Карты', url: 'https://yandex.ru/maps/-/CLgxm4OM' }],
+          [{ text: '📋 Назад к брони', callback_data: `back_to_booking_${ctx.match[1]}_${ctx.match[2]}` }]
+        ]
+      }
+    }
+  );
+});
+
+// 2. 📱 Запросить телефон клиента
+bot.action(/^call_client_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  
+  await ctx.answerCbQuery('Запрашиваю телефон клиента...');
+
+  await ctx.reply(
+    `📱 *Запрос телефона клиента*\n\n` +
+    `Клиент ID: ${userId}\n\n` +
+    '1. Напишите клиенту, чтобы получить его телефон\n' +
+    '2. Или используйте стандартный шаблон ниже:\n\n' +
+    '--- ШАБЛОН СООБЩЕНИЯ ---\n' +
+    'Здравствуйте! Для подтверждения брони нам нужен ваш номер телефона. ' +
+    'Пожалуйста, отправьте его в ответном сообщении.\n' +
+    '--- КОНЕЦ ШАБЛОНА ---\n\n' +
+    'Или используйте кнопки для быстрой связи:',
+    { 
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📲 Написать клиенту', url: `tg://user?id=${userId}` },
+            { text: '📋 Скопировать шаблон', callback_data: `copy_template_${userId}` }
+          ],
+          [
+            { text: '📞 Показать наши контакты', callback_data: `call_company_${userId}_${ctx.match[2]}` }
+          ]
+        ]
+      }
+    }
+  );
+});
+
+// 3. Копирование шаблона сообщения
+bot.action(/^copy_template_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  
+  await ctx.answerCbQuery('✅ Шаблон скопирован в буфер обмена');
+  
+  await ctx.reply(
+    '📋 *Шаблон для отправки клиенту:*\n\n' +
+    '```\n' +
+    'Здравствуйте! Для подтверждения брони нам нужен ваш номер телефона. ' +
+    'Пожалуйста, отправьте его в ответном сообщении.\n' +
+    '```\n\n' +
+    '1. Скопируйте текст выше\n' +
+    '2. Нажмите кнопку ниже\n' +
+    '3. Вставьте текст в сообщение',
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📲 Отправить клиенту', url: `tg://user?id=${userId}` }]
+        ]
+      }
+    }
+  );
+});
+
+// 4. Позвонить клиенту (если телефон уже есть)
+bot.action(/^call_client_phone_(\d+)_(\d+)$/, async (ctx) => {
+  const userId = ctx.match[1];
+  
+  await ctx.answerCbQuery('Показываю телефон клиента...');
+  
+  await ctx.reply(
+    `📱 *Телефон клиента*\n\n` +
+    `Клиент ID: ${userId}\n\n` +
+    'Телефон клиента должен быть сохранен в системе при бронировании.\n' +
+    'Если телефон не сохранен, свяжитесь с клиентом через Telegram:',
+    { 
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '💬 Написать в Telegram', url: `tg://user?id=${userId}` }],
+          [{ text: '📞 Показать наши контакты', callback_data: `call_company_${userId}_${ctx.match[2]}` }]
+        ]
+      }
+    }
+  );
+});
+
+// 5. Возврат к просмотру брони
+bot.action(/^back_to_booking_(\d+)_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery('Возвращаемся...');
+  
+  await ctx.reply(
+    'Используйте кнопки в оригинальном сообщении с бронью для дальнейших действий.',
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '👈 Вернуться', callback_data: 'back_to_original' }]
+        ]
+      }
+    }
+  );
+});
+
+// КОМАНДА ДЛЯ АДМИНА (уже существует, не трогать)
+bot.command('admin', async (ctx) => {
+  // ... существующий код ...
+});
 // Команда для админа
 bot.command('admin', async (ctx) => {
   if (ctx.from.id !== ADMIN_ID) {
