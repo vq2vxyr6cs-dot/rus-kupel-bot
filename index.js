@@ -34,16 +34,29 @@ bot.use(session({
             time: null,
             hours: null,
             kupel: null,
-            venik: initVenikSession(), // 
+            venik: initVenikSession(),
             step: 'start'
         }
     })
 }));
+
 // ===== 6. Добавляем обработчик вебхука =====
 app.use(express.json());
 app.use(bot.webhookCallback('/webhook'));
 
-// ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ СБРОСА БРОНИ =====
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+
+// Инициализация веников в сессии (ОСТАВЛЯЕМ ТОЛЬКО ОДИН ЭКЗЕМПЛЯР)
+function initVenikSession() {
+  return {
+    dub: { type: 'Дубовый', count: 0, price: 400 },
+    bereza: { type: 'Берёзовый', count: 0, price: 350 },
+    step: 'select', // 'select' → 'quantity' → 'confirm'
+    selectedType: null
+  };
+}
+
+// Сброс брони
 function resetBooking(ctx) {
     ctx.session.booking = {
         bath: null,
@@ -51,18 +64,9 @@ function resetBooking(ctx) {
         time: null,
         hours: null,
         kupel: null,
-        venik: initVenikSession(), // 
+        venik: initVenikSession(),
         step: 'start'
     };
-}
-// Инициализация веников в сессии
-// Инициализация веников в сессии
-function initVenikSession() {
-  return {
-    dub: { type: 'Дубовый', count: 0, price: 400 },
-    bereza: { type: 'Берёзовый', count: 0, price: 350 },
-    step: 'select' // 'select' → 'quantity' → 'confirm'
-  };
 }
 
 // Функция для получения текста сводки по веникам
@@ -91,29 +95,24 @@ function getVenikSummary(venikSession) {
   
   return summary;
 }
-    dub: { type: 'Дубовый', count: 0, price: 400 },
-    bereza: { type: 'Берёзовый', count: 0, price: 350 },
-    step: 'select' // 'select' → 'quantity' → 'confirm'
-  };
-}
-// Главная клавиатура
+
+// КЛАВИАТУРЫ
 function mainKeyboard() {
   return Markup.keyboard([
     ['✅ Забронировать'],
     ['👀 Обзор бань'],
     ['💰 Цены'],
-    ['📍 Как добраться']  // Новая кнопка
+    ['📍 Как добраться']
   ]).resize();
 }
 
-// Клавиатура выбора бани
 function bathKeyboard() {
   return Markup.keyboard([
-    ['🤴🏻 Царь баня', '🟢 Богатырская баня'], // 
+    ['🤴🏻 Царь баня', '🟢 Богатырская баня'],
     ['🔙 В меню']
   ]).resize();
 }
-// Клавиатура выбора количества часов
+
 function hoursKeyboard() {
   return Markup.keyboard([
     ['2 часа', '3 часа'],
@@ -122,7 +121,6 @@ function hoursKeyboard() {
   ]).resize();
 }
 
-// Клавиатура купели (только для Богатырской при 2-х часах)
 function kupelKeyboard() {
   return Markup.keyboard([
     ['Да, добавить купель'],
@@ -131,10 +129,14 @@ function kupelKeyboard() {
   ]).resize();
 }
 
-// Клавиатура выбора веников (обновленная)
-// Клавиатура выбора веников
+function confirmKeyboard() {
+  return Markup.keyboard([
+    ['✅ Забронировать'],
+    ['✏️ Изменить']
+  ]).resize();
+}
+
 function venikKeyboard(venikSession = null) {
-  // Если у нас уже есть данные о выбранных вениках, показываем итог
   if (venikSession && venikSession.step === 'confirm') {
     return Markup.keyboard([
       ['✅ Подтвердить веники'],
@@ -143,7 +145,6 @@ function venikKeyboard(venikSession = null) {
     ]).resize();
   }
   
-  // Основная клавиатура выбора
   return Markup.keyboard([
     ['🌳 Дубовый веник', '🌿 Берёзовый веник'],
     ['📊 Посмотреть выбор', '✅ Готово'],
@@ -151,23 +152,14 @@ function venikKeyboard(venikSession = null) {
   ]).resize();
 }
 
-// Клавиатура выбора количества
 function venikQuantityKeyboard() {
   return Markup.keyboard([
     ['1 шт', '2 шт', '3 шт', '4 шт'],
     ['↩️ Назад к выбору типа']
   ]).resize();
 }
-  
-  // Основная клавиатура выбора
-  return Markup.keyboard([
-    ['🌳 Дубовый веник', '🌿 Берёзовый веник'],
-    ['📊 Посмотреть выбор', '✅ Готово'],
-    ['🚫 Без веников']
-  ]).resize();
-}
 
-// Текст итоговой брони (для пользователя и админа)
+// Текст итоговой брони
 function bookingSummary(booking, user = null) {
   let summary = '🧾 *ВАША БРОНЬ:*\n';
   summary += `• Баня: ${booking.bath}\n`;
@@ -175,7 +167,6 @@ function bookingSummary(booking, user = null) {
   summary += `• Время: ${booking.time}\n`;
   summary += `• Часов: ${booking.hours}\n`;
   
-  // Логика для купели
   if (booking.bath === 'Царь баня') {
     summary += `• Купель: включена\n`;
   } else if (booking.bath === 'Богатырская баня') {
@@ -187,11 +178,9 @@ function bookingSummary(booking, user = null) {
     }
   }
   
-  // ОТОБРАЖЕНИЕ ВЕНИКОВ
   summary += `\n📊 *ВЕНИКИ:*\n`;
   if (booking.venik) {
     const venikSummary = getVenikSummary(booking.venik);
-    // Убираем первую строку из getVenikSummary, т.к. у нас уже есть заголовок
     const lines = venikSummary.split('\n');
     summary += lines.slice(1).join('\n');
   } else {
@@ -206,40 +195,36 @@ function bookingSummary(booking, user = null) {
   
   return summary;
 }
-// ===== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ =====
-// Безопасное обновление сообщений с Markdown разметкой
+
+// Безопасное обновление сообщений
 function safeEditMessage(ctx, additionalText) {
-  // Получаем оригинальный текст из callbackQuery
   const originalText = ctx.callbackQuery.message.text;
   
-  // Очищаем от Markdown разметки 
   const cleanText = originalText
-    .replace(/\*/g, '')    // удаляем *
-    .replace(/_/g, '')     // удаляем _
-    .replace(/`/g, '')     // удаляем `
-    .replace(/\[/g, '')    // удаляем [ для ссылок
-    .replace(/\]/g, '')    // удаляем ] для ссылок
-    .replace(/\(/g, '')    // удаляем ( для ссылок
-    .replace(/\)/g, '');   // удаляем ) для ссылок
+    .replace(/\*/g, '')
+    .replace(/_/g, '')
+    .replace(/`/g, '')
+    .replace(/\[/g, '')
+    .replace(/\]/g, '')
+    .replace(/\(/g, '')
+    .replace(/\)/g, '');
   
-  // Возвращаем безопасный текст
   return `${cleanText}\n\n${additionalText}`;
 }
 
 // ===== ОБРАБОТЧИКИ КОМАНД =====
-// /start
 bot.start(async (ctx) => {
   resetBooking(ctx);
   await ctx.replyWithPhoto(
-   { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' },
+    { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' },
     {
       caption: '🔥 Добро пожаловать в Русскую Купель!\n\nВыберите действие:',
       reply_markup: mainKeyboard().reply_markup
     }
   );
 });
+
 // ===== ОБРАБОТКА КНОПОК И ТЕКСТА =====
-// Обработка кнопки "👀 Обзор бань"
 bot.hears('👀 Обзор бань', async (ctx) => {
   await ctx.reply(
     'Выберите баню для просмотра обзора:',
@@ -249,22 +234,21 @@ bot.hears('👀 Обзор бань', async (ctx) => {
     ]).resize()
   );
 });
-// Обзор Богатырской бани
+
 bot.hears('🎥 Богатырская баня', async (ctx) => {
-  await ctx.reply(
-  'https://t.me/rukupel/4/', // 
-  {
-    caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
-    reply_markup: Markup.inlineKeyboard([
-      Markup.button.callback('Вернуться в меню', 'back_to_menu')
-    ]).reply_markup
-  }
-);
+  await ctx.replyWithVideo(
+    'https://t.me/rukupel/4/',
+    {
+      caption: '🎥 Обзор Богатырской бани\n\nПосле просмотра можете вернуться в меню.',
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Вернуться в меню', 'back_to_menu')
+      ]).reply_markup
+    }
+  );
 });
 
-// Обзор Царь бани
 bot.hears('🎥 Царь баня', async (ctx) => {
-  await ctx.reply(
+  await ctx.replyWithVideo(
     'https://t.me/rukupel/3/',
     {
       caption: '🎥 Обзор Царь бани\n\nПосле просмотра можете вернуться в меню.',
@@ -275,12 +259,11 @@ bot.hears('🎥 Царь баня', async (ctx) => {
   );
 });
 
-// Обработка inline-кнопки "Вернуться в меню"
 bot.action('back_to_menu', async (ctx) => {
   await ctx.deleteMessage();
   await ctx.reply('Возвращаю в главное меню:', mainKeyboard());
 });
-// Обработка кнопки "💰 Цены"
+
 bot.hears('💰 Цены', async (ctx) => {
   await ctx.replyWithPhoto(
     { url: 'https://ltdfoto.ru/images/2025/12/08/PRAIS-01.10.2025.png' },
@@ -291,19 +274,15 @@ bot.hears('💰 Цены', async (ctx) => {
                '• Купель: 1000 руб (только к Богатырской на 2 часа)\n' +
                '• Веник: 350-400 руб\n\n' +
                'Минимальное время брони - 2 часа.',
-      parse_mode: 'HTML',
+      parse_mode: 'Markdown',
       reply_markup: mainKeyboard().reply_markup
     }
   );
 });
-  
-  
 
-// Обработка кнопки "📍 Как добраться"
 bot.hears('📍 Как добраться', async (ctx) => {
-  // Отправляем видео с маршрутом
-  await ctx.reply(
-    'https://t.me/rukupel/6/', // 
+  await ctx.replyWithVideo(
+    'https://t.me/rukupel/6/',
     {
       caption: '📍 *Как добраться до Русской Купели:*\n\n' +
                '• Адрес: г. Новосибирск, ул. Советское шоссе 12 к1\n' +
@@ -318,45 +297,40 @@ bot.hears('📍 Как добраться', async (ctx) => {
   );
 });
 
-// Обработка кнопки "Позвонить"
 bot.action('call_us', async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply('📞 Наш телефон: +7 (XXX) XXX-XX-XX\nЗвоните с 9:00 до 22:00!');
 });
+
 // Кнопка «Забронировать»
 bot.hears('✅ Забронировать', async (ctx) => {
   const booking = ctx.session.booking || {};
   const step = booking.step || 'start';
 
-  // Если мы ещё не начали оформление — запускаем выбор бани
   if (step === 'start') {
     booking.step = 'bath';
     ctx.session.booking = booking;
     return ctx.reply('Выберите баню:', bathKeyboard());
   }
 
-  // Если мы на шаге подтверждения — считаем, что бронь подтверждена
   if (step === 'confirm') {
     booking.step = 'done';
     ctx.session.booking = booking;
 
-    // 1. Сообщение клиенту
     await ctx.reply(
       '🔥 Спасибо! Ваша бронь подтверждена.\nАдминистратор свяжется с вами в ближайшее время.',
       mainKeyboard()
     );
 
-// 2. Отправляем администратору
     try {
       const userInfo = ctx.from;
       const adminMessage = `📞 *НОВАЯ БРОНЬ!*\n\n${bookingSummary(booking, userInfo)}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`;
       
-      // Отправляем сообщение админу с кнопками
       await ctx.telegram.sendMessage(
         ADMIN_ID,
         adminMessage,
         {
-          parse_mode: 'HTML',
+          parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [
@@ -378,16 +352,14 @@ bot.hears('✅ Забронировать', async (ctx) => {
     } catch (error) {
       console.error('Ошибка отправки админу:', error);
     }
-    // 3. Сбрасываем состояние
+    
     resetBooking(ctx);
     return;
   }
 
-  // На других шагах просим двигаться по логике
   return ctx.reply('Давайте сначала закончим текущую бронь 🙂');
 });
 
-// Кнопка «Изменить» — возвращаемся в начало оформления
 bot.hears('✏️ Изменить', async (ctx) => {
   resetBooking(ctx);
   ctx.session.booking.step = 'bath';
@@ -406,27 +378,31 @@ bot.hears(['🤴🏻 Царь баня', '🟢 Богатырская баня']
   
   await ctx.reply('Введите желаемую дату (например, 12.12.25 или 12 декабря):');
 });
+
+bot.hears('🔙 В меню', async (ctx) => {
+  resetBooking(ctx);
+  await ctx.reply('Главное меню:', mainKeyboard());
+});
+
 bot.hears('🔙 Назад', async (ctx) => {
   const booking = ctx.session.booking || {};
   
-  // Если мы в процессе бронирования — возвращаемся к выбору бани
   if (booking.step && booking.step !== 'start') {
     booking.step = 'bath';
     booking.date = null;
     booking.time = null;
     booking.hours = null;
     booking.kupel = null;
-    booking.venik = null;
+    booking.venik = initVenikSession();
     ctx.session.booking = booking;
     
     await ctx.reply('Вернулись к выбору бани:', bathKeyboard());
   } else {
-    // Иначе возвращаемся в главное меню
     await ctx.reply('Главное меню:', mainKeyboard());
   }
 });
 
-// Выбор количества часов (ОБНОВЛЕННАЯ ЛОГИКА)
+// Выбор количества часов
 bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'hours') {
@@ -437,22 +413,18 @@ bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (c
   const hoursNum = parseInt(booking.hours) || 0;
   ctx.session.booking = booking;
 
-  // НОВАЯ ЛОГИКА: проверяем баню и количество часов
   if (booking.bath === 'Богатырская баня') {
     if (hoursNum < 3) {
-      // Меньше 3 часов — спрашиваем про купель
       booking.step = 'kupel';
       ctx.session.booking = booking;
       return ctx.reply('Добавить купель?', kupelKeyboard());
     } else {
-      // 3+ часов — купель автоматически включена
       booking.kupel = 'да (автоматически)';
       booking.step = 'venik';
       ctx.session.booking = booking;
       return ctx.reply('✅ Купель автоматически включена (от 3-х часов).\n\nВыберите вариант веника:', venikKeyboard());
     }
   } else if (booking.bath === 'Царь баня') {
-    // Для Царь-бани купель всегда включена, переходим к веникам
     booking.kupel = 'включена';
     booking.step = 'venik';
     ctx.session.booking = booking;
@@ -460,7 +432,7 @@ bot.hears(['2 часа', '3 часа', '4 часа', 'Более 4х'], async (c
   }
 });
 
-// Выбор купели (актуально только для Богатырской < 3 часов)
+// Выбор купели
 bot.hears(['Да, добавить купель', 'Без купели'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'kupel') {
@@ -475,14 +447,12 @@ bot.hears(['Да, добавить купель', 'Без купели'], async 
 });
 
 // Выбор веника
-// 1. Начало выбора веника (выбор типа)
 bot.hears(['🌳 Дубовый веник', '🌿 Берёзовый веник'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'venik' || !booking.venik) {
     return;
   }
 
-  // Определяем тип веника
   const venikType = ctx.message.text.includes('Дубовый') ? 'dub' : 'bereza';
   booking.venik.selectedType = venikType;
   booking.venik.step = 'quantity';
@@ -494,7 +464,6 @@ bot.hears(['🌳 Дубовый веник', '🌿 Берёзовый веник
   );
 });
 
-// 2. Выбор количества
 bot.hears(['1 шт', '2 шт', '3 шт', '4 шт'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'venik' || !booking.venik || booking.venik.step !== 'quantity') {
@@ -504,7 +473,6 @@ bot.hears(['1 шт', '2 шт', '3 шт', '4 шт'], async (ctx) => {
   const count = parseInt(ctx.message.text);
   const venikType = booking.venik.selectedType;
   
-  // Обновляем количество
   if (venikType === 'dub') {
     booking.venik.dub.count = count;
   } else if (venikType === 'bereza') {
@@ -512,9 +480,9 @@ bot.hears(['1 шт', '2 шт', '3 шт', '4 шт'], async (ctx) => {
   }
   
   booking.venik.step = 'select';
+  booking.venik.selectedType = null;
   ctx.session.booking = booking;
 
-  // Показываем текущий выбор
   const summary = getVenikSummary(booking.venik);
   await ctx.reply(
     `${summary}\n\nПродолжайте выбирать веники или нажмите "✅ Готово"`,
@@ -522,7 +490,6 @@ bot.hears(['1 шт', '2 шт', '3 шт', '4 шт'], async (ctx) => {
   );
 });
 
-// 3. Управление выбором
 bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ Изменить веники', '🚫 Без веников', '↩️ Назад к выбору типа'], async (ctx) => {
   const booking = ctx.session.booking || {};
   if (booking.step !== 'venik') {
@@ -538,7 +505,6 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
   }
 
   if (action === '✅ Готово' || action === '✅ Подтвердить веники') {
-    // Завершаем выбор веников
     booking.venik.step = 'confirm';
     ctx.session.booking = booking;
     
@@ -548,7 +514,6 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
       venikKeyboard(booking.venik)
     );
     
-    // Переходим к подтверждению всей брони
     booking.step = 'confirm';
     ctx.session.booking = booking;
     
@@ -568,12 +533,10 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
   }
 
   if (action === '🚫 Без веников') {
-    // Сбрасываем все веники
     booking.venik = initVenikSession();
     booking.venik.step = 'confirm';
     ctx.session.booking = booking;
     
-    // Переходим к подтверждению всей брони
     booking.step = 'confirm';
     ctx.session.booking = booking;
     
@@ -587,6 +550,7 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
 
   if (action === '↩️ Назад к выбору типа') {
     booking.venik.step = 'select';
+    booking.venik.selectedType = null;
     ctx.session.booking = booking;
     await ctx.reply('Выберите тип веника:', venikKeyboard());
     return;
@@ -594,26 +558,20 @@ bot.hears(['📊 Посмотреть выбор', '✅ Готово', '✏️ �
 });
 
 // ===== ОБРАБОТКА КНОПОК АДМИНА =====
-
-// 1. ✅ Подтверждение брони админом
 bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
   const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('✅ Бронь подтверждена!');
-
-  // Безопасное обновление сообщения
-  const originalText = ctx.callbackQuery.message.text || '';
- const newText = safeEditMessage(ctx, `✅ Подтверждено @${adminUsername}`);
+  
+  const newText = safeEditMessage(ctx, `✅ Подтверждено @${adminUsername}`);
   
   try {
     await ctx.editMessageText(newText);
   } catch (editError) {
-    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
+    console.log('Не удалось обновить сообщение');
   }
 
-  // Уведомляем клиента
   try {
     await ctx.telegram.sendMessage(
       userId,
@@ -625,29 +583,24 @@ bot.action(/^confirm_(\d+)_(\d+)$/, async (ctx) => {
   }
 });
 
-// 2. ❌ Отклонение брони админом
 bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
   const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
   const adminUsername = ctx.from.username || 'администратора';
 
   await ctx.answerCbQuery('❌ Бронь отклонена!');
-
-  // Безопасное обновление сообщения
-  const originalText = ctx.callbackQuery.message.text || '';
-  const newText = originalText + `\n\n❌ Отклонено @${adminUsername}`;
+  
+  const newText = safeEditMessage(ctx, `❌ Отклонено @${adminUsername}`);
   
   try {
     await ctx.editMessageText(newText);
   } catch (editError) {
-    console.log('Не удалось обновить сообщение (возможно уже обновлено)');
+    console.log('Не удалось обновить сообщение');
   }
 
-  // Уведомляем клиента
   try {
     await ctx.telegram.sendMessage(
       userId,
-      '❌ *К сожалению, администратор отклонил вашу бронь.*\n\nПожалуйста, свяжитесь с нами для уточнения:\n📞 +7 (XXX) XXX-XX-XX',
+      '❌ *К сожалению, администратор отклонил вашу бронь.*\n\nПожалуйста, свяжитесь с нами для уточнения.',
       { parse_mode: 'Markdown' }
     );
   } catch (error) {
@@ -655,79 +608,41 @@ bot.action(/^reject_(\d+)_(\d+)$/, async (ctx) => {
   }
 });
 
-// 3. ✏️ Редактирование брони админом
-bot.action(/^edit_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
+// ... остальные обработчики admin кнопок ...
 
-  await ctx.answerCbQuery('Открываем меню редактирования...');
-
-  // Отправляем админу меню выбора поля для редактирования
-  await ctx.reply(
-    `Выберите, что хотите исправить в бронировании клиента (ID: ${userId}):`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '📅 Дата и время', callback_data: `edit_date_${userId}_${timestamp}` }],
-          [{ text: '🏠 Тип бани', callback_data: `edit_bath_${userId}_${timestamp}` }],
-          [{ text: '⏱ Часы', callback_data: `edit_hours_${userId}_${timestamp}` }],
-          [{ text: '↩️ Назад к просмотру', callback_data: `back_to_view_${userId}_${timestamp}` }]
-        ]
-      }
-    }
-  );
-});
-
-// 4. 📞 Позвонить (показывает контактную информацию)
-bot.action(/^call_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.match[1];
-  const timestamp = ctx.match[2];
-
-  await ctx.answerCbQuery('📞 Показываю контакты...');
-
-  await ctx.reply(
-    '📞 *Контактная информация:*\n\n' +
-    '• Телефон компании: +7 (XXX) XXX-XX-XX\n' +
-    '• Для связи с клиентом используйте кнопку "💬 Написать"',
-    { 
-      parse_mode: 'Markdown'
-    }
-  );
-});
-// ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА (ДАТА/ВРЕМЯ) =====
+// ===== ОБРАБОТКА ПРОСТОГО ТЕКСТА =====
 bot.on('text', async (ctx) => {
   const text = ctx.message.text;
   const booking = ctx.session.booking || {};
 
-  // Если сессии ещё не было — инициализируем
   if (!booking.step) {
     resetBooking(ctx);
     return ctx.reply('Нажмите кнопку «Забронировать», чтобы начать.', mainKeyboard());
   }
 
- // Если ждём дату
-if (booking.step === 'date') {
-  // Простая проверка формата
-  if (!text.match(/^\d{1,2}\.\d{1,2}\.\d{2,4}$/)) {
-    return ctx.reply('❌ Введите дату в формате ДД.ММ.ГГ (например, 25.12.24)');
+  // Обработка даты
+  if (booking.step === 'date') {
+    if (!text.match(/^\d{1,2}\.\d{1,2}\.\d{2,4}$|^\d{1,2}\s*[а-яА-Я]+$/)) {
+      return ctx.reply('❌ Введите дату в формате ДД.ММ.ГГ (например, 25.12.24) или "12 декабря"');
+    }
+    booking.date = text;
+    booking.step = 'time';
+    ctx.session.booking = booking;
+    return ctx.reply('📅 Дата принята! Введите время начала (например, 17:00):');
   }
-  booking.date = text;
-  booking.step = 'time';
-  ctx.session.booking = booking;
-  return ctx.reply('📅 Дата принята! Введите время начала (например, 17:00):');
-}
- // Если ждём время
-if (booking.step === 'time') {
-  if (!text.match(/^\d{1,2}:\d{2}$/)) {
-    return ctx.reply('❌ Введите время в формате ЧЧ:ММ (например, 17:00)');
-  }
-  booking.time = text;
-  booking.step = 'hours';
-  ctx.session.booking = booking;
-  return ctx.reply('⏱ Сколько часов бронируем?', hoursKeyboard());
-}
 
-  // Если ждём выбор по кнопкам — подсказываем
+  // Обработка времени
+  if (booking.step === 'time') {
+    if (!text.match(/^\d{1,2}:\d{2}$/)) {
+      return ctx.reply('❌ Введите время в формате ЧЧ:ММ (например, 17:00)');
+    }
+    booking.time = text;
+    booking.step = 'hours';
+    ctx.session.booking = booking;
+    return ctx.reply('⏱ Сколько часов бронируем?', hoursKeyboard());
+  }
+
+  // Подсказки для других шагов
   if (booking.step === 'hours') {
     return ctx.reply('Пожалуйста, выберите количество часов с помощью кнопок ниже.', hoursKeyboard());
   }
@@ -744,7 +659,6 @@ if (booking.step === 'time') {
     return ctx.reply('Подтвердите или измените бронь с помощью кнопок.', confirmKeyboard());
   }
 
-  // На всякий случай — дефолт
   return ctx.reply('Нажмите «Забронировать», чтобы начать оформление.', mainKeyboard());
 });
 
@@ -766,8 +680,6 @@ bot.command('admin', async (ctx) => {
 });
 
 // ===== ЗАПУСК СЕРВЕРА =====
-
-// Healthcheck для Railway
 app.get('/', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -782,4 +694,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Webhook доступен по адресу: /webhook`);
   console.log(`🏥 Healthcheck: http://localhost:${PORT}/`);
   console.log(`🤖 Бот готов к работе!`);
-});
+});
