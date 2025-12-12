@@ -27,14 +27,14 @@ console.log('✅ Бот создан с токеном');
     
 // ===== 5. Подключаем сессии =====
 bot.use(session({
-    defaultSession: () => ({
+  defaultSession: () => ({
         booking: {
             bath: null,
             date: null,
             time: null,
             hours: null,
             kupel: null,
-            venik: null,
+            venik: initVenikSession(), // 
             step: 'start'
         }
     })
@@ -51,13 +51,46 @@ function resetBooking(ctx) {
         time: null,
         hours: null,
         kupel: null,
-        venik: initVenikSession(), // ИЗМЕНЕНИЕ ЗДЕСЬ
+        venik: initVenikSession(), // 
         step: 'start'
     };
 }
 // Инициализация веников в сессии
+// Инициализация веников в сессии
 function initVenikSession() {
   return {
+    dub: { type: 'Дубовый', count: 0, price: 400 },
+    bereza: { type: 'Берёзовый', count: 0, price: 350 },
+    step: 'select' // 'select' → 'quantity' → 'confirm'
+  };
+}
+
+// Функция для получения текста сводки по веникам
+function getVenikSummary(venikSession) {
+  let summary = '📊 *Ваш выбор веников:*\n';
+  let totalCount = 0;
+  let totalPrice = 0;
+  
+  if (venikSession.dub.count > 0) {
+    summary += `• ${venikSession.dub.type}: ${venikSession.dub.count} шт. (${venikSession.dub.price * venikSession.dub.count} руб)\n`;
+    totalCount += venikSession.dub.count;
+    totalPrice += venikSession.dub.price * venikSession.dub.count;
+  }
+  
+  if (venikSession.bereza.count > 0) {
+    summary += `• ${venikSession.bereza.type}: ${venikSession.bereza.count} шт. (${venikSession.bereza.price * venikSession.bereza.count} руб)\n`;
+    totalCount += venikSession.bereza.count;
+    totalPrice += venikSession.bereza.price * venikSession.bereza.count;
+  }
+  
+  if (totalCount === 0) {
+    summary += '• Веники не выбраны\n';
+  } else {
+    summary += `\n*Итого:* ${totalCount} шт. на сумму ${totalPrice} руб`;
+  }
+  
+  return summary;
+}
     dub: { type: 'Дубовый', count: 0, price: 400 },
     bereza: { type: 'Берёзовый', count: 0, price: 350 },
     step: 'select' // 'select' → 'quantity' → 'confirm'
@@ -76,7 +109,7 @@ function mainKeyboard() {
 // Клавиатура выбора бани
 function bathKeyboard() {
   return Markup.keyboard([
-    ['🤴🏻 Царь баня', '🟢 Богатырская баня'], // ← Эмодзи вместо пробела
+    ['🤴🏻 Царь баня', '🟢 Богатырская баня'], // 
     ['🔙 В меню']
   ]).resize();
 }
@@ -99,10 +132,10 @@ function kupelKeyboard() {
 }
 
 // Клавиатура выбора веников (обновленная)
+// Клавиатура выбора веников
 function venikKeyboard(venikSession = null) {
   // Если у нас уже есть данные о выбранных вениках, показываем итог
   if (venikSession && venikSession.step === 'confirm') {
-    const venikSummary = getVenikSummary(venikSession);
     return Markup.keyboard([
       ['✅ Подтвердить веники'],
       ['✏️ Изменить веники'],
@@ -125,55 +158,12 @@ function venikQuantityKeyboard() {
     ['↩️ Назад к выбору типа']
   ]).resize();
 }
-
-// Функция для расчёта общей стоимости (только баня и купель)
-function calculateTotal(booking) {
-  let total = 0;
-  let details = [];
   
-  // Стоимость бани по часам
-  let bathPrice = 0;
-  const hours = parseInt(booking.hours) || 2;
-  
-  if (booking.bath === 'Богатырская баня') {
-    if (hours === 2) bathPrice = 1200;
-    else if (hours === 3) bathPrice = 1500;
-    else if (hours === 4) bathPrice = 2000;
-    else bathPrice = 2000 + (hours - 4) * 500; // более 4 часов
-    details.push(`• Баня (${hours} ч.): ${bathPrice}₽`);
-  } else if (booking.bath === 'Царь баня') {
-    bathPrice = 3500 * hours;
-    details.push(`• Баня (${hours} ч.): ${bathPrice}₽`);
-  }
-  
-  total += bathPrice;
-  
-  // Стоимость купели
-  if (booking.bath === 'Богатырская баня') {
-    const hoursNum = parseInt(booking.hours) || 0;
-    if (hoursNum < 3 && booking.kupel === 'да') {
-      total += 1000;
-      details.push(`• Купель: 1000₽`);
-    } else if (hoursNum >= 3) {
-      details.push(`• Купель: включена`);
-    }
-  } else if (booking.bath === 'Царь баня') {
-    details.push(`• Купель: включена`);
-  }
-  
-  return {
-    total,
-    details: details.join('\n'),
-    bathPrice,
-    hours
-  };
-}
-
-// Клавиатура подтверждения
-function confirmKeyboard() {
+  // Основная клавиатура выбора
   return Markup.keyboard([
-    ['✅ Забронировать'],
-    ['✏️ Изменить']
+    ['🌳 Дубовый веник', '🌿 Берёзовый веник'],
+    ['📊 Посмотреть выбор', '✅ Готово'],
+    ['🚫 Без веников']
   ]).resize();
 }
 
@@ -222,7 +212,7 @@ function safeEditMessage(ctx, additionalText) {
   // Получаем оригинальный текст из callbackQuery
   const originalText = ctx.callbackQuery.message.text;
   
-  // Очищаем от Markdown разметки (простой способ)
+  // Очищаем от Markdown разметки 
   const cleanText = originalText
     .replace(/\*/g, '')    // удаляем *
     .replace(/_/g, '')     // удаляем _
@@ -275,7 +265,7 @@ bot.hears('🎥 Богатырская баня', async (ctx) => {
 // Обзор Царь бани
 bot.hears('🎥 Царь баня', async (ctx) => {
   await ctx.reply(
-    'https://t.me/rukupel/3/', // ← ЗАПЯТАЯ!
+    'https://t.me/rukupel/3/',
     {
       caption: '🎥 Обзор Царь бани\n\nПосле просмотра можете вернуться в меню.',
       reply_markup: Markup.inlineKeyboard([
