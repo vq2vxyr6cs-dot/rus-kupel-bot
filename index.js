@@ -126,31 +126,47 @@ function venikQuantityKeyboard() {
   ]).resize();
 }
 
-// Функция для получения текста сводки по веникам
-function getVenikSummary(venikSession) {
-  let summary = '📊 *Ваш выбор веников:*\n';
-  let totalCount = 0;
-  let totalPrice = 0;
+// Функция для расчёта общей стоимости (только баня и купель)
+function calculateTotal(booking) {
+  let total = 0;
+  let details = [];
   
-  if (venikSession.dub.count > 0) {
-    summary += `• ${venikSession.dub.type}: ${venikSession.dub.count} шт. (${venikSession.dub.price * venikSession.dub.count} руб)\n`;
-    totalCount += venikSession.dub.count;
-    totalPrice += venikSession.dub.price * venikSession.dub.count;
+  // Стоимость бани по часам
+  let bathPrice = 0;
+  const hours = parseInt(booking.hours) || 2;
+  
+  if (booking.bath === 'Богатырская баня') {
+    if (hours === 2) bathPrice = 1200;
+    else if (hours === 3) bathPrice = 1500;
+    else if (hours === 4) bathPrice = 2000;
+    else bathPrice = 2000 + (hours - 4) * 500; // более 4 часов
+    details.push(`• Баня (${hours} ч.): ${bathPrice}₽`);
+  } else if (booking.bath === 'Царь баня') {
+    bathPrice = 3500 * hours;
+    details.push(`• Баня (${hours} ч.): ${bathPrice}₽`);
   }
   
-  if (venikSession.bereza.count > 0) {
-    summary += `• ${venikSession.bereza.type}: ${venikSession.bereza.count} шт. (${venikSession.bereza.price * venikSession.bereza.count} руб)\n`;
-    totalCount += venikSession.bereza.count;
-    totalPrice += venikSession.bereza.price * venikSession.bereza.count;
+  total += bathPrice;
+  
+  // Стоимость купели
+  if (booking.bath === 'Богатырская баня') {
+    const hoursNum = parseInt(booking.hours) || 0;
+    if (hoursNum < 3 && booking.kupel === 'да') {
+      total += 1000;
+      details.push(`• Купель: 1000₽`);
+    } else if (hoursNum >= 3) {
+      details.push(`• Купель: включена`);
+    }
+  } else if (booking.bath === 'Царь баня') {
+    details.push(`• Купель: включена`);
   }
   
-  if (totalCount === 0) {
-    summary += '• Веники не выбраны\n';
-  } else {
-    summary += `\n*Итого:* ${totalCount} шт. на сумму ${totalPrice} руб`;
-  }
-  
-  return summary;
+  return {
+    total,
+    details: details.join('\n'),
+    bathPrice,
+    hours
+  };
 }
 
 // Клавиатура подтверждения
